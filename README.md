@@ -29,6 +29,14 @@ _Formatting a Reference Genome Database_:
 
 Using a collection of reference genomes, run the `AMGMA/build_db` script.
 
+Input data for this step is simply a collection of microbial genomes, and
+a manifest CSV file listing those genomes. The CSV must have the following
+columns: `uri,id,name`:
+
+  * `uri`: Location of the genome FASTA
+  * `id`: Unique alphanumeric ID for each genome
+  * `name`: Longer description of each genome, with whitespaces allowed (but no commas)
+
 _Annotate Reference Genomes_:
 
 Using that genome database, annotate with a set of microbiome association results
