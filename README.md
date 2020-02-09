@@ -11,7 +11,7 @@ collection of genetic components, such as genes. In turn, each of those genetic
 components (e.g. genes) can be associated with some outcome of interest via
 the analysis of microbiome surveys by metagenomic sequencing. The tool most easily
 used for this purpose (and compatible for downstream analysis by AMGMA) is
-[GeneShot](https://www.github.org/Golob-Minot/GeneShot).
+[GeneShot](https://www.github.com/Golob-Minot/GeneShot).
 
 After each microbial gene has been associated with outcome of interest (such
 as a particular human disease), then those association metrics can be summarized
