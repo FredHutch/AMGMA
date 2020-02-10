@@ -1,0 +1,19 @@
+name: Geneshot CI
+
+on: [push, pull_request]  
+
+jobs:
+
+  workflow:
+    runs-on: ubuntu-latest
+    env:
+      NXF_ANSI_LOG: 0
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Nextflow
+        run: |
+          wget -qO- get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+      - name:  Run geneshot
+        run: |
+          NXF_VER=19.10.0 nextflow run build_db.nf -with-docker ubuntu:18.04 -w work/ --manifest data/genome.manifest.csv --output_folder db/ --output_prefix amgma
