@@ -170,6 +170,7 @@ process makeHDF {
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
     label 'io_limited'
     errorStrategy "retry"
+    publishDir "${params.output_folder}"
 
     input:
         file csv_list from csv_ch.collect()
@@ -242,6 +243,7 @@ process diamondDB {
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
     label 'mem_veryhigh'
     errorStrategy 'retry'
+    publishDir "${params.output_folder}"
     
     input:
     file "input.*.fasta.gz" from combined_fasta_ch.collect()
