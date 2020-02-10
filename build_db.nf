@@ -187,19 +187,21 @@ import pandas as pd
 # Open a connection to the output HDF
 with pd.HDFStore("${params.output_prefix}.hdf", "w") as store:
 
-    # Write all of the gene annotations to /genes
-    pd.concat([
+    # Write all of the gene annotations to /genomes/<genome_id>
+    for genome_id, genome_df in pd.concat([
         pd.read_csv(
             fp,
             sep=",",
             compression="gzip"
         )
         for fp in "${csv_list}".split(" ")
-    ]).to_hdf(
-        store,
-        "/genes",
-        format = "fixed"
-    )
+    ]).groupby("genome_id"):
+    
+        genome_df.to_hdf(
+            store,
+            "/genomes/%s" % genome_id,
+            format = "fixed"
+        )
 
     # Write the manifest to /manifest
     pd.read_csv(
