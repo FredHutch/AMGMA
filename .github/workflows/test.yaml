@@ -1,4 +1,4 @@
-name: Geneshot CI
+name: AMGMA CI
 
 on: [push, pull_request]  
 
