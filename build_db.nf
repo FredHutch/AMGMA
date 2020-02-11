@@ -127,6 +127,12 @@ def read_gff(fp):
         "type == 'CDS'"
     )
 
+    # Append "_N" to the gene IDs
+    df["gene_id"] = [
+        "%s_%d" % (s, ix + 1)
+        for ix, s in enumerate(df["gene_id"].values)
+    ]
+
     df = pd.concat(
         [
             df.reindex(columns=[
