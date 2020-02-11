@@ -16,7 +16,7 @@ jobs:
           sudo mv nextflow /usr/local/bin/
       - name:  Build Database
         run: |
-          NXF_VER=19.10.0 nextflow run build_db.nf -with-docker ubuntu:18.04 -w work/ --manifest data/genome.manifest.csv --output_folder db/ --output_prefix amgma -profile testing
+          NXF_VER=19.10.0 nextflow run build_db.nf -with-docker ubuntu:18.04 -w work/ --manifest data/genome.manifest.csv --output_folder /share/db --output_prefix amgma -profile testing
       - name:  Align Results
         run: |
-          NXF_VER=19.10.0 nextflow run align.nf -with-docker ubuntu:18.04 -w work/ --geneshot_hdf data/geneshot.summary.hdf5 --geneshot_fasta data/genes.fasta.gz --db_dmnd db/amgma_test.dmnd --db_hdf db/amgma_test.hdf --output_folder output --output_hdf amgma_test.output.hdf -profile testing
+          NXF_VER=19.10.0 nextflow run align.nf -with-docker ubuntu:18.04 -w work/ --geneshot_hdf data/geneshot.summary.hdf5 --geneshot_fasta data/genes.fasta.gz --db_dmnd /share/db/amgma_test.dmnd --db_hdf /share/db/amgma_test.hdf --output_folder /share/output --output_hdf amgma_test.output.hdf -profile testing
