@@ -43,13 +43,48 @@ if (params.help || params.manifest == null){
 }
 
 // Parse the manifest
-genome_ch = Channel.from(
+Channel.from(
     file(params.manifest)
 ).splitCsv(
     header: true
 ).map {
-    r -> [r["id"], file(r["uri"])]
+    r -> [r["id"], r["uri"]]
+}.branch {
+    ftp: it[1].startsWith("ftp://")
+    other: !it[1].startsWith("ftp://")
+}.set {
+    split_genome_ch
 }
+
+
+// Fetch genomes via FTP
+process fetchFTP {
+    tag "Download genomes hosted by FTP"
+    container 'quay.io/fhcrc-microbiome/wget@sha256:98b90e8bb8a171182505f1e255b0bd85cbbda68f08c08b4877c3fc48e63ac82f'
+    label 'io_limited'
+    errorStrategy "retry"
+
+    input:
+        tuple val(id), val(url) from split_genome_ch.ftp
+    
+    output:
+        tuple val(id), file("*") into downloaded_genome_ch
+    
+"""
+#!/bin/bash
+set -e 
+
+wget "${url}"
+
+"""
+}
+
+// Now join the channels together
+genome_ch = split_genome_ch.other.map {
+    r -> [r[0], file(r[1])]
+}.mix(
+    downloaded_genome_ch
+)
 
 // Annotation of coding sequences with prodigal
 process prodigal {
@@ -70,11 +105,8 @@ process prodigal {
 set -e 
 
 # Decompress the genome if it is GZIP compressed
-if [[ \$(gzip -d ${genome_fasta}) ]]; then
-    gunzip -c ${genome_fasta} > ${genome_fasta}.fasta
-else
-    mv ${genome_fasta} ${genome_fasta}.fasta
-fi
+gunzip -c ${genome_fasta} > ${genome_fasta}.fasta || \
+mv ${genome_fasta} ${genome_fasta}.fasta
 
 # Add the genome ID to the FASTA headers
 sed -i 's/>/>${id}_/g' ${genome_fasta}.fasta
