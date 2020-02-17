@@ -7,6 +7,7 @@ params.output_folder = false
 params.output_prefix = false
 params.min_identity = 90
 params.min_coverage = 50
+params.batchsize = 100
 
 // Function which prints help message text
 def helpMessage() {
@@ -23,6 +24,7 @@ def helpMessage() {
     Optional Arguments:
       --min_identity        Percent identity threshold used to pick centroids (default: 90)
       --min_coverage        Percent coverage threshold used to pick centroids (default: 50)
+      --batchsize           Number of genomes to download in a batch (default: 100)
 
     Manifest:
       The manifest is a CSV listing all of the genomes to be used for the database.
@@ -56,7 +58,6 @@ Channel.from(
     split_genome_ch
 }
 
-
 // Fetch genomes via FTP
 process fetchFTP {
     tag "Download genomes hosted by FTP"
@@ -65,25 +66,68 @@ process fetchFTP {
     errorStrategy "retry"
 
     input:
-        tuple val(id), val(url) from split_genome_ch.ftp
+        val uri_id_list from split_genome_ch.ftp.map{r -> "${r[1]}:::${r[0]}"}.toSortedList().flatten().collate(params.batchsize)
     
     output:
-        tuple val(id), file("*") into downloaded_genome_ch
+        file "*.fasta.gz" into downloaded_genome_ch
     
 """
 #!/bin/bash
-set -e 
+set -e
 
-wget "${url}"
+for uri_id in ${uri_id_list.join(" ")}; do
+
+    uri=\$(echo \$uri_id | sed 's/:::.*//')
+    id=\$(echo \$uri_id | sed 's/.*::://')
+
+    echo "Downloading \$id from \$uri"
+
+    # Try multiple times
+    for _ in {1..5}; do
+        ( wget -O \$id.fasta.gz \$uri && break ) || sleep 0.5
+    done
+
+    # Make sure the file is gzip compressed
+    (gzip -t \$id.fasta.gz && echo "\$id.fasta.gz is in gzip format") || ( echo "\$id.fasta.gz is NOT in gzip format" && exit 1 )
+
+done
+
+echo "done"
+
+"""
+}
+
+// Rename the files from S3 to explicitly match the provided ID
+process renameRemoteFiles {
+    container 'ubuntu:18.04'
+    label 'io_limited'
+    errorStrategy 'retry'
+
+    input:
+        tuple val(id), file(genome_fasta) from split_genome_ch.other.map{r -> [r[0], file(r[1])]}
+
+    output:
+        file "${id}.fasta.gz" into renamed_genome_ch
+
+"""
+#!/bin/bash
+
+set -e
+
+ls -lahtr
+
+mv ${genome_fasta} ${id}.fasta.gz
+
+(gzip -t ${id}.fasta.gz && echo "${genome_fasta} is in gzip format") || ( echo "${genome_fasta} is NOT in gzip format" && exit 1 )
 
 """
 }
 
 // Now join the channels together
-genome_ch = split_genome_ch.other.map {
-    r -> [r[0], file(r[1])]
-}.mix(
-    downloaded_genome_ch
+genome_ch = renamed_genome_ch.mix(
+    downloaded_genome_ch.flatten()
+).toSortedList(
+).flatten(
 )
 
 // Annotation of coding sequences with prodigal
@@ -94,35 +138,44 @@ process prodigal {
     errorStrategy "retry"
 
     input:
-        tuple val(id), file(genome_fasta) from genome_ch
+        file genome_fasta_list from genome_ch.collate(params.batchsize)
     
     output:
-        file "${id}.faa.gz" into fasta_ch
-        file "${id}.gff.gz" into gff_ch
+        file "*.faa.gz" into fasta_ch
+        file "*.gff.gz" into gff_ch
     
 """
 #!/bin/bash
-set -e 
+set -e
 
-# Decompress the genome if it is GZIP compressed
-gunzip -c ${genome_fasta} > ${genome_fasta}.fasta || \
-mv ${genome_fasta} ${genome_fasta}.fasta
+# Process each of the genomes in this batch
+for genome_fasta in ${genome_fasta_list}; do
 
-# Add the genome ID to the FASTA headers
-sed -i 's/>/>${id}_/g' ${genome_fasta}.fasta
+    # Parse the ID from the file name
+    genome_id=\${genome_fasta%.fasta.gz}
 
-prodigal \
-    -a ${id}.faa \
-    -i  ${genome_fasta}.fasta \
-    -f gff \
-    -o ${id}.gff \
-    -p meta
+    echo "Processing \$genome_id from \$genome_fasta"
 
-# Add the genome ID to the GFF output
-sed -i "s/^${id}/${id}\t${id}/g" ${id}.gff
+    # Decompress the genome
+    gunzip \$genome_fasta
 
-gzip ${id}.gff
-gzip ${id}.faa
+    # Add the genome ID to the FASTA headers
+    sed -i "s/>/>\${genome_id}_/g" \${genome_id}.fasta
+
+    prodigal \
+        -a \${genome_id}.faa \
+        -i  \${genome_id}.fasta \
+        -f gff \
+        -o \${genome_id}.gff \
+        -p meta
+
+    # Add the genome ID to the GFF output
+    sed -i "s/^\${genome_id}/\${genome_id}\t\${genome_id}/g" \${genome_id}.gff
+
+    gzip \${genome_id}.gff
+    gzip \${genome_id}.faa
+
+done
 
 """
 }
@@ -135,7 +188,7 @@ process combineGFF {
     errorStrategy "retry"
 
     input:
-        file gff_gz from gff_ch.toSortedList().flatten().collate(100)
+        file gff_gz from gff_ch.flatten().toSortedList().flatten().collate(params.batchsize)
     
     output:
         file "*.csv.gz" into csv_ch
@@ -216,7 +269,7 @@ process combineFASTA {
     errorStrategy "retry"
 
     input:
-        file fasta_gz from fasta_ch.toSortedList().flatten().collate(100)
+        file fasta_gz from fasta_ch.flatten().toSortedList().flatten().collate(params.batchsize)
     
     output:
         file "combined.fasta.gz" into combined_fasta_ch
