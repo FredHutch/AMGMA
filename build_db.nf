@@ -28,7 +28,7 @@ def helpMessage() {
 
     Manifest:
       The manifest is a CSV listing all of the genomes to be used for the database.
-      The manifest much contain the column headers: uri,id,name
+      The manifest must contain the column headers: uri,id,name
       The URI may start with ftp://, s3://, or even just be a path to a local file. 
       The ID must be unique, and only contain a-z, A-Z, 0-9, or _.
       The NAME may be longer and contain whitespaces, but may not contain a comma.
@@ -42,6 +42,40 @@ if (params.help || params.manifest == null){
     helpMessage()
     // Exit out and do not run anything else
     exit 0
+}
+
+// Validate that all genomes are unique in the manifest
+process validateManifest {
+    tag "Enforce unique genome IDs"
+    container "quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed"
+    label 'io_limited'
+
+    input:
+    file manifest from file(params.manifest)
+
+    output:
+    file "${manifest}" into manifest_csv
+
+"""
+#!/usr/bin/env python3
+
+import pandas as pd
+
+# Read in the CSV
+manifest = pd.read_csv("${manifest}")
+
+for k in ['uri', 'id', 'name']:
+    assert k in manifest, "Please provide %s as a column in the manifest" % k
+
+# Make sure that all genome IDs are unique
+all_unique = True
+for n, v in manifest['uri'].value_counts().items():
+    if v > 1:
+        all_unique = False
+        print("%s is found %d times in the manifest" % (n, v))
+assert all_unique, "Must provide entirely unique genome IDs"
+
+"""
 }
 
 // Parse the manifest
@@ -350,7 +384,7 @@ process makeHDF {
 
     input:
         file csv_list from csv_ch.collect()
-        file manifest_csv from file(params.manifest)
+        file manifest_csv
         file centroids_tsv
     
     output:
