@@ -103,7 +103,7 @@ process fetchFTP {
         val uri_id_list from split_genome_ch.ftp.map{r -> "${r[1]}:::${r[0]}"}.toSortedList().flatten().collate(params.batchsize)
     
     output:
-        file "*.fasta.gz" into downloaded_genome_ch
+        file "genomes_fasta.tar" into downloaded_genome_ch
     
 """
 #!/bin/bash
@@ -125,6 +125,9 @@ for uri_id in ${uri_id_list.join(" ")}; do
     (gzip -t \$id.fasta.gz && echo "\$id.fasta.gz is in gzip format") || ( echo "\$id.fasta.gz is NOT in gzip format" && exit 1 )
 
 done
+
+echo "Making a tar with all genomes in this batch"
+tar cvfh genomes_fasta.tar *.fasta.gz
 
 echo "done"
 
@@ -157,11 +160,31 @@ mv ${genome_fasta} ${id}.fasta.gz
 """
 }
 
+// Combine remote files into tar files with ${batchsize} genomes each
+process combineRemoteFiles {
+    container 'ubuntu:18.04'
+    label 'io_limited'
+    errorStrategy 'retry'
+
+    input:
+        file fasta_list from renamed_genome_ch.collate(params.batchsize)
+
+    output:
+        file "genomes_fasta.tar" into renamed_genome_tar_ch
+
+"""
+#!/bin/bash
+
+set -e
+
+tar cvfh genomes_fasta.tar ${fasta_list}
+
+"""
+}
+
 // Now join the channels together
-genome_ch = renamed_genome_ch.mix(
-    downloaded_genome_ch.flatten()
-).toSortedList(
-).flatten(
+genome_ch = renamed_genome_tar_ch.mix(
+    downloaded_genome_ch
 )
 
 // Annotation of coding sequences with prodigal
@@ -172,18 +195,24 @@ process prodigal {
     errorStrategy "retry"
 
     input:
-        file genome_fasta_list from genome_ch.collate(params.batchsize)
+        file genome_fasta_tar from genome_ch
     
     output:
-        file "*.faa.gz" into fasta_ch
-        file "*.gff.gz" into gff_ch
+        file "combined.fasta.gz" into combined_fasta_ch
+        file "all_gff.tar" into gff_ch
     
 """
 #!/bin/bash
 set -e
 
+# Unpack the tar, all of which match *.fasta.gz
+tar xvf ${genome_fasta_tar}
+
+# Show the working directory for debugging purposes
+ls -lahtr
+
 # Process each of the genomes in this batch
-for genome_fasta in ${genome_fasta_list}; do
+for genome_fasta in *.fasta.gz; do
 
     # Parse the ID from the file name
     genome_id=\${genome_fasta%.fasta.gz}
@@ -211,6 +240,10 @@ for genome_fasta in ${genome_fasta_list}; do
 
 done
 
+# Make the output tar files
+tar cvfh all_gff.tar *gff.gz
+cat *faa.gz > combined.fasta.gz
+
 """
 }
 
@@ -222,15 +255,21 @@ process combineGFF {
     errorStrategy "retry"
 
     input:
-        file gff_gz from gff_ch.flatten().toSortedList().flatten().collate(params.batchsize)
+        file gff_tar from gff_ch
     
     output:
-        file "*.csv.gz" into csv_ch
+        file "combined.csv.gz" into csv_ch
     
 """
 #!/usr/bin/env python3
 
+import os
 import pandas as pd
+import tarfile
+
+# Extract all of the files from the input tarfile
+tf = tarfile.open("${gff_tar}")
+tf.extractall()
 
 # Function to read in a single GFF file
 def read_gff(fp):
@@ -282,38 +321,16 @@ def read_gff(fp):
     return df
 
 # Read in all of the GFF files and write to a file
-output_fp = "${gff_gz}".split(" ", 1)[0] + ".csv.gz"
+output_fp = "combined.csv.gz"
 pd.concat([
     read_gff(fp)
-    for fp in "${gff_gz}".split(" ")
+    for fp in os.listdir(".")
+    if fp.endswith("gff.gz")
 ]).to_csv(
     output_fp,
     index=None,
     compression="gzip"
 )
-"""
-}
-
-
-// Combine gene FASTA files
-process combineFASTA {
-    tag "Combine gene FASTA files"
-    container "ubuntu:18.04"
-    label 'io_limited'
-    errorStrategy "retry"
-
-    input:
-        file fasta_gz from fasta_ch.flatten().toSortedList().flatten().collate(params.batchsize)
-    
-    output:
-        file "combined.fasta.gz" into combined_fasta_ch
-    
-"""
-#!/bin/bash
-
-set -e
-
-cat ${fasta_gz} > combined.fasta.gz
 """
 }
 
@@ -383,7 +400,7 @@ process makeHDF {
     publishDir "${params.output_folder}"
 
     input:
-        file csv_list from csv_ch.collect()
+        file "combined.*.csv.gz" from csv_ch.collect()
         file manifest_csv
         file centroids_tsv
     
@@ -394,6 +411,7 @@ process makeHDF {
 #!/usr/bin/env python3
 
 import pandas as pd
+import os
 
 # Read the table linking genome genes to centroid genes
 centroid_df = pd.read_csv(
@@ -429,7 +447,8 @@ with pd.HDFStore("${params.output_prefix}.hdf", "w") as store:
                 "gc_cont"
             ]
         )
-        for fp in "${csv_list}".split(" ")
+        for fp in os.listdir(".")
+        if fp.startswith("combined.") and fp.endswith(".csv.gz")
     ]).groupby("genome_id"):
 
         genome_df.to_hdf(
