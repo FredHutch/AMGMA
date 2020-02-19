@@ -16,7 +16,7 @@ jobs:
           sudo mv nextflow /usr/local/bin/
       - name:  Align Results
         run: |
-          cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run align.nf -with-docker ubuntu:18.04 -w work/ --geneshot_hdf data/geneshot.summary.hdf5 --geneshot_fasta data/genes.fasta.gz --db_dmnd data/amgma.dmnd --db_hdf data/amgma.hdf --output_folder output --output_hdf amgma_test.output.hdf -profile testing 
+          cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run align.nf -with-docker ubuntu:18.04 -w work/ --geneshot_hdf data/geneshot.summary.hdf5 --geneshot_dmnd data/geneshot.dmnd --db_dmnd data/amgma.dmnd --db_hdf data/amgma.hdf --output_folder output --output_hdf amgma_test.output.hdf -profile testing 
         working-directory: /tmp/
 
   buildDB:
@@ -50,5 +50,5 @@ jobs:
         working-directory: /tmp/
       - name:  Align Results
         run: |
-          cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run align.nf -with-docker ubuntu:18.04 -w work/ --geneshot_hdf data/geneshot.summary.hdf5 --geneshot_fasta data/genes.fasta.gz --db_dmnd db/amgma.dmnd --db_hdf db/amgma.hdf --output_folder output --output_hdf amgma_test.output.hdf -profile testing 
+          cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run align.nf -with-docker ubuntu:18.04 -w work/ --geneshot_hdf data/geneshot.summary.hdf5 --geneshot_dmnd data/geneshot.dmnd --db_dmnd db/amgma.dmnd --db_hdf db/amgma.hdf --output_folder output --output_hdf amgma_test.output.hdf -profile testing 
         working-directory: /tmp/
