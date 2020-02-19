@@ -268,8 +268,9 @@ import pandas as pd
 import tarfile
 
 # Extract all of the files from the input tarfile
-tf = tarfile.open("${gff_tar}")
+tf = tarfile.open("${gff_tar}", mode = "r")
 tf.extractall()
+tf.close()
 
 # Function to read in a single GFF file
 def read_gff(fp):
