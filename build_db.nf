@@ -7,7 +7,7 @@ params.output_folder = false
 params.output_prefix = false
 params.min_identity = 90
 params.min_coverage = 50
-params.batchsize = 100
+params.batchsize = 10
 
 // Function which prints help message text
 def helpMessage() {
@@ -116,10 +116,7 @@ for uri_id in ${uri_id_list.join(" ")}; do
 
     echo "Downloading \$id from \$uri"
 
-    # Try multiple times
-    for _ in {1..5}; do
-        ( wget -O \$id.fasta.gz \$uri && break ) || sleep 0.5
-    done
+    wget -O \$id.fasta.gz \$uri
 
     # Make sure the file is gzip compressed
     (gzip -t \$id.fasta.gz && echo "\$id.fasta.gz is in gzip format") || ( echo "\$id.fasta.gz is NOT in gzip format" && exit 1 )
