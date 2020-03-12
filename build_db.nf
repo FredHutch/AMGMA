@@ -405,7 +405,6 @@ process makeHDF {
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
     label 'mem_medium'
     errorStrategy "retry"
-    publishDir "${params.output_folder}"
 
     input:
         file "combined.*.csv.gz" from csv_ch.collect()
@@ -413,7 +412,7 @@ process makeHDF {
         file centroids_tsv
     
     output:
-        file "${params.output_prefix}.hdf"
+        file "${params.output_prefix}.hdf" into output_hdf5
     
 """
 #!/usr/bin/env python3
@@ -487,6 +486,33 @@ with pd.HDFStore("${params.output_prefix}.hdf", "w") as store:
     )
 
 """
+}
+
+
+// Repack and compress the final HDF5 file
+process repackHDF {
+
+    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    tag "Compress HDF store"
+    label "mem_veryhigh"
+    errorStrategy "retry"
+    publishDir "${params.output_folder}"
+    
+    input:
+    file output_hdf5
+        
+    output:
+    file "${output_hdf5}"
+
+    """
+#!/bin/bash
+
+set -e
+
+[ -s ${output_hdf5} ]
+
+h5repack -f GZIP=5 ${output_hdf5} TEMP && mv TEMP ${output_hdf5}
+    """
 }
 
 
