@@ -121,6 +121,7 @@ import pandas as pd
 from statsmodels.stats.multitest import multipletests
 
 store_fp = "${geneshot_hdf}"
+print("Reading data from %s" % store_fp)
 
 ###################
 # READ INPUT DATA #
@@ -131,8 +132,10 @@ with pd.HDFStore(store_fp, "r") as store:
     for k in ["/stats/cag/corncob", "/annot/gene/all"]:
         assert k in store, "Could not find %s in %s" % (k, store_fp)
 
+    print("Reading /stats/cag/corncob")
     corncob_df = pd.read_hdf(store, "/stats/cag/corncob")
 
+    print("Reading /annot/gene/all")
     annot_df = pd.read_hdf(store, "/annot/gene/all")
 
 
