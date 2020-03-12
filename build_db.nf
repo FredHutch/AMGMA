@@ -393,7 +393,7 @@ echo "Making output FASTA - done"
 process makeHDF {
     tag "Make a single output HDF"
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
-    label 'io_limited'
+    label 'mem_medium'
     errorStrategy "retry"
     publishDir "${params.output_folder}"
 
