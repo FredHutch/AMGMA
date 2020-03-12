@@ -446,7 +446,6 @@ with pd.HDFStore("${params.output_prefix}.hdf", "w") as store:
             compression="gzip"
         ).reindex(
             columns = [
-                "genome_id",
                 "gene_id",
                 "start",
                 "end",
