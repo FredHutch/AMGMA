@@ -235,7 +235,7 @@ for genome_fasta in *.fasta.gz; do
     gzip \${genome_id}.gff
     gzip \${genome_id}.faa
 
-    rm \$genome_fasta
+    rm \${genome_id}.fasta
 
 done
 
