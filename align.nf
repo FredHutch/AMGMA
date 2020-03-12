@@ -105,7 +105,7 @@ geneshot_hdf = file(params.geneshot_hdf)
 process parseAssociations {
     tag "Extract gene association data for the study"
     container "${container__pandas}"
-    label 'io_limited'
+    label 'mem_medium'
     errorStrategy "retry"
 
     input:
