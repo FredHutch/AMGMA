@@ -450,7 +450,7 @@ def process_genome(genome_id):
     genome_aln_df["genome_centroid"] = genome_aln_df["gene_id"].apply(
         genome_centroid_df["genome_centroid"].get
     )
-    assert genome_aln_df["genome_centroid"].isnull().sum() == 0, genome_aln_df.head()
+    assert genome_aln_df["genome_centroid"].isnull().sum() == 0, genome_aln_df.loc[genome_aln_df["genome_centroid"].isnull()]
 
     # Add in the 'catalog' gene label
     genome_aln_df["catalog_gene"] = genome_aln_df["genome_centroid"].apply(
