@@ -446,6 +446,7 @@ with pd.HDFStore("${params.output_prefix}.hdf", "w") as store:
             compression="gzip"
         ).reindex(
             columns = [
+                "genome_id",
                 "gene_id",
                 "start",
                 "end",
@@ -458,7 +459,9 @@ with pd.HDFStore("${params.output_prefix}.hdf", "w") as store:
         if fp.startswith("combined.") and fp.endswith(".csv.gz")
     ]).groupby("genome_id"):
 
-        genome_df.to_hdf(
+        genome_df.drop(
+            columns = "genome_id"
+        ).to_hdf(
             store,
             "/genomes/%s" % genome_id,
             format = "fixed",
