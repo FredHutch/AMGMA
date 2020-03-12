@@ -195,7 +195,7 @@ process prodigal {
         file genome_fasta_tar from genome_ch
     
     output:
-        file "combined.fasta.gz" into combined_fasta_ch
+        file "*.combined.fasta.gz" into combined_fasta_ch
         file "all_gff.tar" into gff_ch
     
 """
@@ -235,11 +235,13 @@ for genome_fasta in *.fasta.gz; do
     gzip \${genome_id}.gff
     gzip \${genome_id}.faa
 
+    rm \$genome_fasta
+
 done
 
 # Make the output tar files
 tar cvfh all_gff.tar *gff.gz
-cat *faa.gz > combined.fasta.gz
+cat *faa.gz > \$genome_fasta.combined.fasta.gz
 
 """
 }
@@ -341,7 +343,7 @@ process clusterGenes {
     errorStrategy 'retry'
     
     input:
-    file "input.*.fasta.gz" from combined_fasta_ch.collect()
+    file fasta_list from combined_fasta_ch.collect()
     
     output:
     file "centroids.fasta.gz" into centroids_fasta
@@ -352,11 +354,19 @@ process clusterGenes {
 
 set -e
 
+# Make sure that all input files were staged
+for fp in ${fasta_list}; do
+    echo "Checking for \$fp"
+
+    [[ -s \$fp ]]
+
+done
+
 # Make a single file with all of the input files
 echo "Combining input files"
-gunzip -c input.*.fasta.gz | gzip -c > combined.fasta.gz
+cat ${fasta_list}  > combined.fasta.gz
 echo "Combining input files - done"
-rm input.*.fasta.gz
+rm ${fasta_list}
 
 # Make the MMSeqs2 database
 echo "Making MMSeqs2 database"
