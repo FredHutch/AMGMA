@@ -150,7 +150,7 @@ set -e
 
 ls -lahtr
 
-mv ${genome_fasta} ${id}.fasta.gz
+mv ${genome_fasta} TEMP && mv TEMP ${id}.fasta.gz
 
 (gzip -t ${id}.fasta.gz && echo "${genome_fasta} is in gzip format") || ( echo "${genome_fasta} is NOT in gzip format" && exit 1 )
 
