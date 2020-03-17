@@ -2,3 +2,4 @@ uri,id,name
 data/GCF_000819615.1_ViralProj14015_genomic.fna.gz,GCF_000819615,phiX174
 data/GCF_000840245.1_ViralProj14204_genomic.fna.gz,GCF_000840245,phage_lambda
 ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/840/245/GCF_000840245.1_ViralProj14204/GCF_000840245.1_ViralProj14204_genomic.fna.gz,GCF_000840245_FTP,phage_lambda_ftp
+data/NC_000913.3.fasta.gz,NC_000913.3,ecoli
