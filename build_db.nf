@@ -155,7 +155,7 @@ workflow {
 
     // Make a DIAMOND alignment database of all genes
     diamondDB(
-        clusterGenesRound3.out[0]
+        clusterGenesRound3.out
     )
 
     // Assign a centroid to each gene in each genome
