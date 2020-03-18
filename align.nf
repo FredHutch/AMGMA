@@ -421,19 +421,6 @@ print("Processing %d genomes" % len(genome_list))
 # Open a connection to the HDF store with genome alignment information
 genome_store = pd.HDFStore("${db_hdf}", "r")
 
-# Read the table linking `genome_gene` to `genome_centroid`
-print("Reading in table linking genome genes to centroids")
-genome_centroid_df = pd.read_hdf(
-    genome_store, 
-    "/genome_centroids"
-).set_index("genome_gene")
-print("Read in table linking %d genes to %d centroids" % 
-    (
-        genome_centroid_df.shape[0],
-        genome_centroid_df["genome_centroid"].unique().shape[0]
-    ))
-
-
 # Open a connection to the HDF store used for all output information
 output_store = pd.HDFStore("genome_analysis_shard.hdf5", "w")
 
@@ -446,14 +433,8 @@ def process_genome(genome_id):
         "/genomes/%s" % genome_id
     )
 
-    # Add in the centroid label
-    genome_aln_df["genome_centroid"] = genome_aln_df["gene_id"].apply(
-        genome_centroid_df["genome_centroid"].get
-    )
-    assert genome_aln_df["genome_centroid"].isnull().sum() == 0, genome_aln_df.loc[genome_aln_df["genome_centroid"].isnull()]
-
     # Add in the 'catalog' gene label
-    genome_aln_df["catalog_gene"] = genome_aln_df["genome_centroid"].apply(
+    genome_aln_df["catalog_gene"] = genome_aln_df["centroid"].apply(
         aln_df["catalog_gene"].get
     )
     if genome_aln_df["catalog_gene"].dropna().shape[0] == 0:
