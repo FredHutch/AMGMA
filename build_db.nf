@@ -140,7 +140,7 @@ workflow {
 
     // Cluster genome genes by identity to find centroids
     clusterGenesRound1(
-        combineFAA.out.toSortedList().flatten().collate(params.batchsize)
+        combineFAA.out
     )
 
     // Round 2
