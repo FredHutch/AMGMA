@@ -20,7 +20,15 @@ include combineRemoteFiles from './modules/modules'
 include prodigal from './modules/modules'
 include combineGFF from './modules/modules'
 include combineFAA from './modules/modules'
-include clusterGenes from './modules/modules' params(
+include clusterGenes as clusterGenesRound1 from './modules/modules' params(
+    min_identity: params.min_identity,
+    min_coverage: params.min_coverage
+)
+include clusterGenes as clusterGenesRound2 from './modules/modules' params(
+    min_identity: params.min_identity,
+    min_coverage: params.min_coverage
+)
+include clusterGenes as clusterGenesRound3 from './modules/modules' params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage
 )
@@ -131,13 +139,23 @@ workflow {
     )
 
     // Cluster genome genes by identity to find centroids
-    clusterGenes(
-        combineFAA.out.collect()
+    clusterGenesRound1(
+        combineFAA.out.collate(params.batchsize)
+    )
+
+    // Round 2
+    clusterGenesRound2(
+        clusterGenesRound1.out.collate(params.batchsize)
+    )
+
+    // Round 3
+    clusterGenesRound3(
+        clusterGenesRound2.out.collect()
     )
 
     // Make a DIAMOND alignment database of all genes
     diamondDB(
-        clusterGenes.out[0]
+        clusterGenesRound3.out[0]
     )
 
     // Assign a centroid to each gene in each genome

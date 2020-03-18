@@ -318,7 +318,7 @@ process clusterGenes {
     file fasta_list
     
     output:
-    file "centroids.fasta.gz"
+    file "centroids.*.fasta.gz"
     
     """
 #!/bin/bash
@@ -354,10 +354,11 @@ echo "Running clustering - done"
 
 # Get the representative sequences
 echo "Making output FASTA"
+centroids_fasta=\$(mktemp centroids.XXXXX).fasta
 mmseqs result2repseq db cluster_db genes
-mmseqs result2flat db db genes centroids.fasta --use-fasta-header
+mmseqs result2flat db db genes \$centroids_fasta --use-fasta-header
 # Compress
-gzip centroids.fasta
+gzip \$centroids_fasta
 echo "Making output FASTA - done"
     """
 }
