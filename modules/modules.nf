@@ -360,6 +360,12 @@ mmseqs result2flat db db genes \$centroids_fasta --use-fasta-header
 # Compress
 gzip \$centroids_fasta
 echo "Making output FASTA - done"
+
+echo "Cleaning up working files"
+
+rm latest db* genes* cluster_db*
+
+echo "Done"
     """
 }
 
