@@ -110,7 +110,7 @@ workflow {
 
     // Combine the remote files
     combineRemoteFiles(
-        renameRemoteFiles.out.collate(params.batchsize)
+        renameRemoteFiles.out.toSortedList().flatten().collate(params.batchsize)
     )
 
     // Validate the manifest
@@ -140,17 +140,17 @@ workflow {
 
     // Cluster genome genes by identity to find centroids
     clusterGenesRound1(
-        combineFAA.out.collate(params.batchsize)
+        combineFAA.out.toSortedList().flatten().collate(params.batchsize)
     )
 
     // Round 2
     clusterGenesRound2(
-        clusterGenesRound1.out.collate(params.batchsize)
+        clusterGenesRound1.out.toSortedList().flatten().collate(params.batchsize)
     )
 
     // Round 3
     clusterGenesRound3(
-        clusterGenesRound2.out.collect()
+        clusterGenesRound2.out.toSortedList()
     )
 
     // Make a DIAMOND alignment database of all genes
