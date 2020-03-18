@@ -311,7 +311,7 @@ pd.concat([
 process clusterGenes {
     tag "Cluster genes with similar sequences"
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
-    label 'mem_medium'
+    label 'mem_veryhigh'
     errorStrategy 'retry'
     
     input:
