@@ -138,23 +138,19 @@ workflow {
         prodigal.out[1]
     )
 
-    // // Cluster genome genes by identity to find centroids
-    // clusterGenesRound1(
-    //     combineFAA.out.toSortedList().flatten().collate(params.batchsize)
-    // )
+    // Cluster genome genes by identity to find centroids
+    clusterGenesRound1(
+        combineFAA.out.toSortedList().flatten().collate(params.batchsize)
+    )
 
-    // // Round 2
-    // clusterGenesRound2(
-    //     clusterGenesRound1.out.toSortedList().flatten().collate(params.batchsize)
-    // )
+    // Round 2
+    clusterGenesRound2(
+        clusterGenesRound1.out.toSortedList().flatten().collate(params.batchsize)
+    )
 
-    // // Round 3
-    // clusterGenesRound3(
-    //     clusterGenesRound2.out.toSortedList()
-    // )
     // Round 3
     clusterGenesRound3(
-        combineGFF.out.toSortedList()
+        clusterGenesRound2.out.toSortedList()
     )
 
     // Make a DIAMOND alignment database of all genes
