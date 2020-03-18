@@ -363,7 +363,7 @@ echo "Making output FASTA - done"
 
 echo "Cleaning up working files"
 
-rm latest db* genes* cluster_db*
+rm latest db* genes* cluster_db* combined.fasta.gz
 
 echo "Done"
     """
