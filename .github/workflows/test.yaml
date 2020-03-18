@@ -31,7 +31,7 @@ jobs:
           sudo mv nextflow /usr/local/bin/
       - name:  Build Database
         run: |
-          cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run build_db.nf -with-docker ubuntu:18.04 -w work/ --manifest data/genome.manifest.csv --output_folder db --output_prefix amgma -profile testing --batchsize 2
+          cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run build_db.nf -with-docker ubuntu:18.04 -w work/ --manifest data/genome.manifest.csv --output_folder db --output_prefix amgma -profile testing --batchsize 2 
         working-directory: /tmp/
 
   workflow:
@@ -46,7 +46,7 @@ jobs:
           sudo mv nextflow /usr/local/bin/
       - name:  Build Database
         run: |
-          cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run build_db.nf -with-docker ubuntu:18.04 -w work/ --manifest data/genome.manifest.csv --output_folder db --output_prefix amgma -profile testing --batchsize 2
+          cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run build_db.nf -with-docker ubuntu:18.04 -w work/ --manifest data/genome.manifest.csv --output_folder db --output_prefix amgma -profile testing --batchsize 2 
         working-directory: /tmp/
       - name:  Align Results
         run: |
