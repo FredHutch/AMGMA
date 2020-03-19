@@ -325,6 +325,11 @@ process clusterGenes {
 
 set -e
 
+echo ""
+df -h
+ls -lahtr
+echo ""
+
 # Make sure that all input files were staged
 for fp in ${fasta_list}; do
     echo "Checking for \$fp"
@@ -339,10 +344,20 @@ cat ${fasta_list}  > combined.fasta.gz
 echo "Combining input files - done"
 rm ${fasta_list}
 
+echo ""
+df -h
+ls -lahtr
+echo ""
+
 # Make the MMSeqs2 database
 echo "Making MMSeqs2 database"
 mmseqs createdb combined.fasta.gz db
 echo "Making MMSeqs2 database - done"
+
+echo ""
+df -h
+ls -lahtr
+echo ""
 
 # Cluster the protein sequences
 echo "Running clustering"
@@ -351,6 +366,11 @@ mmseqs linclust db cluster_db ./ \
     --max-seqs 300 \
     -c ${params.min_coverage / 100}
 echo "Running clustering - done"
+
+echo ""
+df -h
+ls -lahtr
+echo ""
 
 # Get the representative sequences
 echo "Making output FASTA"
@@ -364,6 +384,11 @@ echo "Making output FASTA - done"
 echo "Cleaning up working files"
 
 rm latest db* genes* cluster_db* combined.fasta.gz
+
+echo ""
+df -h
+ls -lahtr
+echo ""
 
 echo "Done"
     """
