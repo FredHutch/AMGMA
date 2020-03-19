@@ -364,6 +364,7 @@ echo "Running clustering"
 mmseqs cluster db cluster_db ./ \
     --min-seq-id ${params.min_identity / 100} \
     --max-seqs 300 \
+    --single-step-clustering \
     -c ${params.min_coverage / 100}
 echo "Running clustering - done"
 
