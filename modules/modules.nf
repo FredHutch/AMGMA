@@ -361,7 +361,7 @@ echo ""
 
 # Cluster the protein sequences
 echo "Running clustering"
-mmseqs linclust db cluster_db ./ \
+mmseqs cluster db cluster_db ./ \
     --min-seq-id ${params.min_identity / 100} \
     --max-seqs 300 \
     -c ${params.min_coverage / 100}
