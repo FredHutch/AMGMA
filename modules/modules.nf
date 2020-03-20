@@ -130,7 +130,7 @@ tar cvfh genomes_fasta.tar ${fasta_list}
 process prodigal {
     tag "Identify protein-coding genes"
     container 'quay.io/biocontainers/prodigal:2.6.3--h516909a_2'
-    label 'mem_medium'
+    label 'io_limited'
     errorStrategy "retry"
 
     input:
@@ -311,7 +311,7 @@ pd.concat([
 process clusterGenes {
     tag "Cluster genes with similar sequences"
     container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
-    label 'mem_veryhigh'
+    label 'mem_medium'
     errorStrategy 'retry'
     
     input:
@@ -456,7 +456,7 @@ echo Done
 process makeHDF {
     tag "Make a single output HDF"
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
-    label 'mem_veryhigh'
+    label 'mem_medium'
     errorStrategy "retry"
 
     input:
@@ -568,7 +568,7 @@ process repackHDF {
 
     container "quay.io/fhcrc-microbiome/python-pandas:latest"
     tag "Compress HDF store"
-    label "mem_veryhigh"
+    label "mem_medium"
     errorStrategy "retry"
     publishDir "${params.output_folder}"
     
