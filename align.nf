@@ -581,7 +581,11 @@ def calc_containment(df, cag_id, n_genes_in_cag):
     ).shape[0] / float(n_genes_in_cag)
 
     # Return the larger of the two
-    return max(genome_prop, cag_prop)
+    return [
+        ("containment", max(genome_prop, cag_prop)),
+        ("genome_prop", genome_prop),
+        ("cag_prop", cag_prop)
+    ]
 
 
 # Keep track of which genomes we have calculated containment for
@@ -630,9 +634,12 @@ with pd.HDFStore("genome_analysis_shard.hdf5", "w") as output_store:
                         dict([
                             ("genome", genome_name),
                             ("CAG", cag_id),
-                            ("n_genes", n_genes),
-                            ("containment", calc_containment(df, cag_id, cag_size[cag_id]))
-                        ])
+                            ("n_genes", n_genes)
+                        ] + calc_containment(
+                            df, 
+                            cag_id, 
+                            cag_size[cag_id]
+                        ))
                         for cag_id, n_genes in df.reindex(
                             columns = ["CAG", "catalog_gene"]
                         ).dropna(
