@@ -233,7 +233,7 @@ print("All done!")
 process alignGenes {
     tag "Align genes against reference database"
     container "quay.io/fhcrc-microbiome/famli@sha256:25c34c73964f06653234dd7804c3cf5d9cf520bc063723e856dae8b16ba74b0c"
-    label 'mem_veryhigh'
+    label 'mem_medium'
     errorStrategy 'retry'
     
     input:
@@ -276,7 +276,7 @@ diamond \
 process splitGenomes {
     tag "Group genomes for parallel processing"
     container "${container__pandas}"
-    label 'mem_medium'
+    label 'io_limited'
     errorStrategy "retry"
 
     input:
@@ -309,7 +309,7 @@ for ix, genome_list in enumerate([
 process formatResults {
     tag "Use alignment information to summarize results"
     container "${container__pandas}"
-    label 'mem_medium'
+    label 'io_limited'
     errorStrategy "retry"
 
     input:
@@ -521,7 +521,7 @@ output_store.close()
 process calculateContainment {
     tag "Overlap between CAGs and genomes"
     container "${container__pandas}"
-    label 'mem_medium'
+    label 'io_limited'
     errorStrategy 'retry'
 
     input:
@@ -661,7 +661,7 @@ with pd.HDFStore("genome_analysis_shard.hdf5", "w") as output_store:
 process combineResults {
     tag "Make a single output HDF"
     container "${container__pandas}"
-    label 'mem_medium'
+    label 'mem_veryhigh'
     errorStrategy "retry"
 
     input:
@@ -823,7 +823,7 @@ process repackHDF {
 
     container "${container__pandas}"
     tag "Compress HDF store"
-    label "mem_veryhigh"
+    label "mem_medium"
     errorStrategy "retry"
     publishDir "${params.output_folder}"
     
