@@ -60,7 +60,7 @@ for uri_id in ${uri_id_list.join(" ")}; do
 
     echo "Downloading \$id from \$uri"
 
-    wget -O \$id.fasta.gz \$uri
+    wget --quiet -O \$id.fasta.gz \$uri
 
     # Make sure the file is gzip compressed
     (gzip -t \$id.fasta.gz && echo "\$id.fasta.gz is in gzip format") || ( echo "\$id.fasta.gz is NOT in gzip format" && exit 1 )
@@ -68,7 +68,7 @@ for uri_id in ${uri_id_list.join(" ")}; do
 done
 
 echo "Making a tar with all genomes in this batch"
-tar cvfh genomes_fasta.tar *.fasta.gz
+tar cfh genomes_fasta.tar *.fasta.gz
 
 echo "done"
 
