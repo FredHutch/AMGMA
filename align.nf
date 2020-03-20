@@ -563,6 +563,27 @@ for fp in input_hdf_list:
 print("Processing input HDF files:")
 print("\\n".join(input_hdf_list))
 
+
+# Function to calculate containment scores
+def calc_containment(df, cag_id, n_genes_in_cag):
+    # df is a DataFrame with the columns catalog_gene and CAG
+    # n_genes_in_cag is an integer with the number of unique genes in the CAG
+
+    # First calculate the proportion of this genome which is captured by this CAG
+    genome_prop = (df["CAG"] == cag_id).mean()
+
+    # Second calculate the proportion of the unique genes in this CAG captured in this genome
+    cag_prop = df.query(
+        "CAG == '%s'" % cag_id
+    )[
+        "cagalog_gene"
+    ].unique(
+    ).shape[0] / float(n_genes_in_cag)
+
+    # Return the larger of the two
+    return max(genome_prop, cag_prop)
+
+
 # Keep track of which genomes we have calculated containment for
 genome_containment = dict()
 
@@ -610,9 +631,13 @@ with pd.HDFStore("genome_analysis_shard.hdf5", "w") as output_store:
                             ("genome", genome_name),
                             ("CAG", cag_id),
                             ("n_genes", n_genes),
-                            ("containment", n_genes / min(cag_size[cag_id], df.shape[0]))
+                            ("containment", calc_containment(df, cag_id, cag_size[cag_id]))
                         ])
-                        for cag_id, n_genes in df["CAG"].value_counts().items()
+                        for cag_id, n_genes in df.reindex(
+                            columns = ["CAG", "catalog_gene"]
+                        ).dropna(
+                        ).drop_duplicates(
+                        )["CAG"].value_counts().items()
                     ])
                     
     # Write the containment table to the output HDF
