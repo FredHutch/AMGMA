@@ -395,13 +395,13 @@ print("Read in %d gene alignments" % aln_df.shape[0])
 # used for the gene alignments) match the names of the genes in the HDF, check for
 # overlap between the two
 
-cagalog_genes_from_fasta = set(aln_df["catalog_gene"].tolist())
-print("Catalog genes from provided FASTA: %d" % len(cagalog_genes_from_fasta))
+catalog_genes_from_fasta = set(aln_df["catalog_gene"].tolist())
+print("Catalog genes from provided FASTA: %d" % len(catalog_genes_from_fasta))
 
 catalog_genes_from_hdf = set(gene_assoc_df.index.values)
 print("Catalog genes from provided HDF: %d" % len(catalog_genes_from_hdf))
 
-catalog_genes_overlap = cagalog_genes_from_fasta & catalog_genes_from_hdf
+catalog_genes_overlap = catalog_genes_from_fasta & catalog_genes_from_hdf
 print("Overlap: %d" % len(catalog_genes_overlap))
 
 assert len(catalog_genes_overlap) > 0
@@ -576,7 +576,7 @@ def calc_containment(df, cag_id, n_genes_in_cag):
     cag_prop = df.query(
         "CAG == '%s'" % cag_id
     )[
-        "cagalog_gene"
+        "catalog_gene"
     ].unique(
     ).shape[0] / float(n_genes_in_cag)
 
