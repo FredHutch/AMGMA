@@ -10,7 +10,7 @@ params.output_folder = false
 params.output_prefix = false
 params.min_identity = 90
 params.min_coverage = 50
-params.batchsize = 10
+params.batchsize = 100
 
 // Import the processes
 include validateManifest from './modules/modules'
