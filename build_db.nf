@@ -32,6 +32,14 @@ include clusterGenes as clusterGenesRound3 from './modules/modules' params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage
 )
+include clusterGenes as clusterGenesRound4 from './modules/modules' params(
+    min_identity: params.min_identity,
+    min_coverage: params.min_coverage
+)
+include clusterGenes as clusterGenesRound5 from './modules/modules' params(
+    min_identity: params.min_identity,
+    min_coverage: params.min_coverage
+)
 include assignCentroids from './modules/modules' params(
     min_identity: params.min_identity,
     min_coverage: params.min_coverage
@@ -150,12 +158,22 @@ workflow {
 
     // Round 3
     clusterGenesRound3(
-        clusterGenesRound2.out.toSortedList()
+        clusterGenesRound2.out.toSortedList().flatten().collate(params.batchsize)
+    )
+
+    // Round 4
+    clusterGenesRound4(
+        clusterGenesRound3.out.toSortedList().flatten().collate(params.batchsize)
+    )
+
+    // Round 5
+    clusterGenesRound5(
+        clusterGenesRound4.out.toSortedList()
     )
 
     // Make a DIAMOND alignment database of all genes
     diamondDB(
-        clusterGenesRound3.out
+        clusterGenesRound5.out
     )
 
     // Assign a centroid to each gene in each genome
