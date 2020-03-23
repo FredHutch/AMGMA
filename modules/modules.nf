@@ -310,7 +310,7 @@ pd.concat([
 // Cluster genome genes by identity to find centroids
 process clusterGenes {
     tag "Cluster genes with similar sequences"
-    container "soedinglab/mmseqs2:version-11"
+    container "quay.io/fhcrc-microbiome/mmseqs2:version-11"
     label 'mem_medium'
     errorStrategy 'retry'
     
