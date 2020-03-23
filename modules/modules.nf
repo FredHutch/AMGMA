@@ -310,7 +310,7 @@ pd.concat([
 // Cluster genome genes by identity to find centroids
 process clusterGenes {
     tag "Cluster genes with similar sequences"
-    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    container "soedinglab/mmseqs2:version-11"
     label 'mem_medium'
     errorStrategy 'retry'
     
@@ -363,7 +363,6 @@ echo ""
 echo "Running clustering"
 mmseqs linclust db cluster_db ./ \
     --min-seq-id ${params.min_identity / 100} \
-    --max-seqs 300 \
     -c ${params.min_coverage / 100}
 echo "Running clustering - done"
 
