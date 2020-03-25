@@ -235,6 +235,7 @@ process combineGFF {
 
 import os
 import pandas as pd
+import gzip
 import tarfile
 import uuid
 
@@ -292,12 +293,18 @@ def read_gff(fp):
     )
     return df
 
+def not_empty(fp):
+    # Check to see if a file is empty
+    with gzip.open(fp, "rt") as handle:
+        first_character = handle.read(1)
+    return first_character is not None
+
 # Read in all of the GFF files and write to a file
 output_fp = "combined.%s.csv.gz" % str(uuid.uuid4())
 pd.concat([
     read_gff(fp)
     for fp in os.listdir(".")
-    if fp.endswith("gff.gz")
+    if fp.endswith("gff.gz") and not_empty(fp)
 ]).to_csv(
     output_fp,
     index=None,
