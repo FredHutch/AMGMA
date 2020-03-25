@@ -56,7 +56,7 @@ def helpMessage() {
     input HDF, as well as the additional tables, 
 
       * /genomes/summary/<feature>
-      * /genomes/deaeil/<feature>/<genome_id>
+      * /genomes/detail/<feature>/<genome_id>
 
       for each <feature> tested in the input, and for each <genome_id> in the database
 
