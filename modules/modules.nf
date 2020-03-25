@@ -294,10 +294,11 @@ def read_gff(fp):
     return df
 
 def not_empty(fp):
-    # Check to see if a file is empty
+    # Check to see if a file has more than the first three lines of header
     with gzip.open(fp, "rt") as handle:
-        first_character = handle.read(1)
-    return first_character is not None
+        for ix, line in enumerate(handle):
+            if ix > 2:
+                return True
 
 # Read in all of the GFF files and write to a file
 output_fp = "combined.%s.csv.gz" % str(uuid.uuid4())
