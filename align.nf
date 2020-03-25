@@ -424,6 +424,10 @@ genome_store = pd.HDFStore("${db_hdf}", "r")
 # Open a connection to the HDF store used for all output information
 output_store = pd.HDFStore("genome_analysis_shard.hdf5", "w")
 
+# Function to check whether a given genome has annotations in the database
+def genome_in_database(genome_id):
+    return "/genomes/%s" % genome_id in genome_store
+
 # Function to process a single genome
 def process_genome(genome_id):
 
@@ -499,6 +503,7 @@ def process_genome(genome_id):
 pd.DataFrame([
     process_genome(genome_id)
     for genome_id in genome_list
+    if genome_in_database(genome_id)
 ]).to_hdf(
     output_store,
     "/genomes/summary/%s" % parameter_name,
