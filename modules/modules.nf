@@ -428,6 +428,11 @@ for genome_fasta in *faa.gz; do
     
     [[ -s \$genome_fasta ]]
 
+    if (( \$( gunzip -c \$genome_fasta | wc -l ) < 2 )); then
+        echo "File contains no genes, skipping"
+        continue
+    fi
+
     # Find the single top hit per query
     diamond \
         blastp \
@@ -493,12 +498,17 @@ for centroids_tar in "${centroids_tar_list}".split(" "):
 
         print("Element: %s" % member.name)
         
-        df = pd.read_csv(
-            tar.extractfile(member),
-            header = None,
-            sep = "\\t",
-            compression = "gzip"
-        )
+        # Not all genomes have genes annotated, which will raise an error at this step
+        # We can just skip those genomes
+        try:
+            df = pd.read_csv(
+                tar.extractfile(member),
+                header = None,
+                sep = "\\t",
+                compression = "gzip"
+            )
+        except:
+            continue
 
         # Assign the mappings to a dict
         genome_gene_catalog_map[
