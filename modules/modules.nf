@@ -546,7 +546,9 @@ with pd.HDFStore("${params.output_prefix}.hdf", "w") as store:
         for fp in "${combined_csv_list}".split(" ")
     ]).groupby("genome_id"):
 
-        assert genome_id in genome_gene_catalog_map, genome_id
+        if genome_id not in genome_gene_catalog_map:
+            print("Skipping %s -- could not find gene catalog map" % genome_id)
+            continue
 
         genome_df.drop(
             columns = "genome_id"
