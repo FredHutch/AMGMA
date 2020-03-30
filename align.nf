@@ -672,20 +672,26 @@ with pd.HDFStore("genome_analysis_shard.hdf5", "w") as output_store:
                     assert genome_containment[genome_name].shape[1] >= 6, (msg % (genome_name, input_hdf, "wrong columns"), genome_containment[genome_name].head())
                     for k in ["genome", "CAG", "n_genes", "containment", "genome_prop", "cag_prop"]:
                         assert k in genome_containment[genome_name].columns.values
-                    
-    # Write the containment table to the output HDF
-    print("Making a single containment table")
-    genome_containment_df = pd.concat(list(genome_containment.values()))
-    assert genome_containment_df.shape[0] > 0, "Problem calculating containment values"
-    
-    genome_containment_df["CAG"] = genome_containment_df["CAG"].apply(int).apply(str)    
 
-    genome_containment_df.to_hdf(
-        output_store,
-        "/genomes/cags/containment",
-        format = "fixed",
-        complevel = 5
-    )
+    # If no containment has been found, skip the summary step
+    if len(genome_containment) == 0:
+        print("No matching genomes, skipping")
+
+    else:
+                        
+        # Write the containment table to the output HDF
+        print("Making a single containment table")
+        genome_containment_df = pd.concat(list(genome_containment.values()))
+        assert genome_containment_df.shape[0] > 0, "Problem calculating containment values"
+        
+        genome_containment_df["CAG"] = genome_containment_df["CAG"].apply(int).apply(str)    
+
+        genome_containment_df.to_hdf(
+            output_store,
+            "/genomes/cags/containment",
+            format = "fixed",
+            complevel = 5
+        )
 """
 
 }
