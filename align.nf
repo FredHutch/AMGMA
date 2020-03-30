@@ -655,12 +655,19 @@ with pd.HDFStore("genome_analysis_shard.hdf5", "w") as output_store:
                         ).drop_duplicates(
                         )["CAG"].value_counts().items()
                     ])
+
+                    # Make sure that the containment DataFrame was made correctly
+                    msg = "Not able to calculate containment for %s in %s (%s)"
+                    assert genome_containment[genome_name].shape[0] > 0, msg % (genome_name, input_hdf, "zero rows")
+                    assert genome_containment[genome_name].shape[1] >= 6, (msg % (genome_name, input_hdf, "wrong columns"), genome_containment[genome_name].head())
+                    for k in ["genome", "CAG", "n_genes", "containment", "genome_prop", "cag_prop"]:
+                        assert k in genome_containment[genome_name].columns.values
                     
     # Write the containment table to the output HDF
     print("Making a single containment table")
     genome_containment_df = pd.concat(list(genome_containment.values()))
     assert genome_containment_df.shape[0] > 0, "Problem calculating containment values"
-    print(genome_containment_df.head())
+    
     genome_containment_df["CAG"] = genome_containment_df["CAG"].apply(int).apply(str)    
 
     genome_containment_df.to_hdf(
