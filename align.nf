@@ -633,6 +633,10 @@ with pd.HDFStore("genome_analysis_shard.hdf5", "w") as output_store:
                         k
                     )
 
+                    if df.shape[0] == 0:
+                        print("No lines found, skipping %s" % genome_name)
+                        continue
+
                     genome_containment[
                         genome_name
                     ] = pd.DataFrame([
@@ -653,10 +657,11 @@ with pd.HDFStore("genome_analysis_shard.hdf5", "w") as output_store:
                     ])
                     
     # Write the containment table to the output HDF
+    print("Making a single containment table")
     genome_containment_df = pd.concat(list(genome_containment.values()))
-    genome_containment_df["CAG"] = genome_containment_df["CAG"].apply(int).apply(str)
-    
     assert genome_containment_df.shape[0] > 0, "Problem calculating containment values"
+    print(genome_containment_df.head())
+    genome_containment_df["CAG"] = genome_containment_df["CAG"].apply(int).apply(str)    
 
     genome_containment_df.to_hdf(
         output_store,
