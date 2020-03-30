@@ -637,6 +637,11 @@ with pd.HDFStore("genome_analysis_shard.hdf5", "w") as output_store:
                         print("No lines found, skipping %s" % genome_name)
                         continue
 
+                    # If this genome has no CAGs assigned, skip it
+                    if df["CAG"].isnull().mean() == 1.0:
+                        print("This genome has no CAGs assigned, skipping")
+                        continue
+
                     genome_containment[
                         genome_name
                     ] = pd.DataFrame([
@@ -655,6 +660,11 @@ with pd.HDFStore("genome_analysis_shard.hdf5", "w") as output_store:
                         ).drop_duplicates(
                         )["CAG"].value_counts().items()
                     ])
+
+                    # Check to see if there are zero rows in the output
+                    if genome_containment[genome_name].shape[0] == 0:
+                        print("Could not calculate containment for %s" % genome_name)
+                    assert genome_containment[genome_name].shape[0] > 0, df
 
                     # Make sure that the containment DataFrame was made correctly
                     msg = "Not able to calculate containment for %s in %s (%s)"
