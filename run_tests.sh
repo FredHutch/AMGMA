@@ -32,8 +32,7 @@ NXF_VER=20.01.0 \
     -w work/ \
     --geneshot_hdf data/geneshot.summary.hdf5 \
     --geneshot_dmnd data/geneshot.dmnd \
-    --db_dmnd testing_output/db/amgma.dmnd \
-    --db_hdf testing_output/db/amgma.hdf \
+    --db testing_output/db/amgma.tar \
     --output_folder testing_output/align \
     --output_hdf amgma_test.output.hdf \
     -profile testing \
