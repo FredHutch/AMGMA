@@ -58,27 +58,24 @@ include diamondDB from './modules/modules' params(
 // Function which prints help message text
 def helpMessage() {
     log.info"""
-    Usage:
+Usage:
 
-    nextflow run FredHutch/AMGMA/build_db.nf <ARGUMENTS>
-    
-    Required Arguments:
-      --manifest            CSV file listing samples (see below)
-      --output_folder       Folder to write output files to
-      --output_prefix       Prefix to use for output file names
+nextflow run FredHutch/AMGMA/build_db.nf <ARGUMENTS>
 
-    Optional Arguments:
-      --min_identity        Percent identity threshold used to pick centroids (default: 90)
-      --min_coverage        Percent coverage threshold used to pick centroids (default: 50)
-      --batchsize           Number of genomes to download in a batch (default: 100)
+Required Arguments:
+  --manifest            CSV file listing samples (see below)
+  --output_folder       Folder to write output files to
+  --output_prefix       Prefix to use for output file names
 
-    Manifest:
-      The manifest is a CSV listing all of the genomes to be used for the database.
-      The manifest must contain the column headers: uri,id,name
-      The URI may start with ftp://, s3://, or even just be a path to a local file. 
-      The ID must be unique, and only contain a-z, A-Z, 0-9, or _.
-      The NAME may be longer and contain whitespaces, but may not contain a comma.
+Optional Arguments:
+  --batchsize           Number of genomes to process in a given batch (default: 100)
 
+Manifest:
+  The manifest is a CSV listing all of the genomes to be used for the database.
+  The manifest much contain the column headers: uri,id,name
+  The URI may start with ftp://, s3://, or even just be a path to a local file.
+  The ID must be unique, and only contain a-z, A-Z, 0-9, or _.
+  The NAME may be longer and contain whitespaces, but may not contain a comma.
     """.stripIndent()
 }
 
