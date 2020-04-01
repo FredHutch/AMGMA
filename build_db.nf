@@ -288,7 +288,7 @@ mv combined_genomes.csv.gz \$prefix.csv.gz
 
 # Make a tarball with both files
 echo -e "\\nMaking single output tarball"
-tar cvf \$prefix.tar \$prefix.csv.gz \$prefix.fasta.gz
+tar cvfh \$prefix.tar \$prefix.csv.gz \$prefix.fasta.gz
 
 echo -e "\\nDone"
 """
@@ -314,7 +314,7 @@ process makeDatabase {
 set -e
 
 # Make a tarball with all of the inputs
-tar cvf ${params.output_prefix}.tar ${tar_list} database_manifest.csv
+tar cvfh ${params.output_prefix}.tar ${tar_list} database_manifest.csv
 
 """
 }
