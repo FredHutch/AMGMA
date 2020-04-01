@@ -91,7 +91,8 @@ workflow {
 
     // Make a single tarball
     makeDatabase(
-        combineGenomes.out.toSortedList()
+        combineGenomes.out.toSortedList(),
+        validateManifest.out
     )
 
 }
@@ -302,6 +303,7 @@ process makeDatabase {
 
     input:
         file tar_list
+        file "database_manifest.csv"
 
     output:
         file "${params.output_prefix}.tar"
@@ -312,7 +314,7 @@ process makeDatabase {
 set -e
 
 # Make a tarball with all of the inputs
-tar cvf ${params.output_prefix}.tar ${tar_list}
+tar cvf ${params.output_prefix}.tar ${tar_list} database_manifest.csv
 
 """
 }
