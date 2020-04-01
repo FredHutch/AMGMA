@@ -21,7 +21,8 @@ NXF_VER=20.01.0 \
     --output_folder testing_output/db \
     --output_prefix amgma \
     -profile testing \
-    --batchsize 2
+    --batchsize 2 \
+    -resume
     
 NXF_VER=20.01.0 \
     nextflow \
@@ -35,4 +36,5 @@ NXF_VER=20.01.0 \
     --db_hdf testing_output/db/amgma.hdf \
     --output_folder testing_output/align \
     --output_hdf amgma_test.output.hdf \
-    -profile testing
+    -profile testing \
+    -resume
