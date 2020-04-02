@@ -10,6 +10,7 @@ params.min_coverage = 80
 params.min_identity = 80
 params.fdr_method = "fdr_bh"
 params.alpha = 0.2
+params.details = false
 
 // Commonly used containers
 container__pandas = "quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed"
@@ -30,6 +31,7 @@ Required Arguments:
 --output_hdf          Name of the output HDF file to write to the output folder
 
 Optional Arguments:
+--details             Include additional detailed results in output (see below)
 --min_coverage        Minimum coverage required for alignment (default: 80)
 --min_identity        Minimum percent identity required for alignment (default: 80)
 --fdr_method          Method used for FDR correction (default: fdr_bh)
@@ -414,18 +416,19 @@ def process_genome(genome_id, genome_aln_df):
             gene_assoc_df[k].get
         )
 
-    # Write out the full table
-    key = "/genomes/detail/%s/%s" % (parameter_name, genome_id)
-    print("Writing out to %s" % key)
-    
-    genome_aln_df.drop(
-        columns = "genome_id"
-    ).to_hdf(
-        output_store,
-        key,
-        format = "fixed",
-        complevel = 5
-    )
+    if "${params.details}" == "true":
+        # Write out the full table
+        key = "/genomes/detail/%s/%s" % (parameter_name, genome_id)
+        print("Writing out to %s" % key)
+        
+        genome_aln_df.drop(
+            columns = "genome_id"
+        ).to_hdf(
+            output_store,
+            key,
+            format = "fixed",
+            complevel = 5
+        )
 
     # Get the table which passes the FDR filter
     genome_aln_df_fdr = genome_aln_df.loc[

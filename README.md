@@ -76,6 +76,7 @@ Required Arguments:
 --output_hdf          Name of the output HDF file to write to the output folder
 
 Optional Arguments:
+--details             Include additional detailed results in output (see below)
 --min_coverage        Minimum coverage required for alignment (default: 80)
 --min_identity        Minimum percent identity required for alignment (default: 80)
 --fdr_method          Method used for FDR correction (default: fdr_bh)
@@ -88,8 +89,9 @@ input HDF, as well as the additional tables,
 * /genomes/manifest
 * /genomes/cags/containment
 * /genomes/summary/<feature>
+* /genomes/detail/<feature>/<genome_id> (Included with --details)
 
-  for each <feature> tested in the input, and for each <genome_id> in the database
+for each <feature> tested in the input, and for each <genome_id> in the database
 ```
 
 ### Example Outputs
