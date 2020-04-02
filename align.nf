@@ -473,7 +473,7 @@ output_store.close()
 process calculateContainment {
     tag "Overlap between CAGs and genomes"
     container "${container__pandas}"
-    label 'io_limited'
+    label 'mem_medium'
     errorStrategy 'retry'
 
     input:
