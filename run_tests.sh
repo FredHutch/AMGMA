@@ -37,3 +37,18 @@ NXF_VER=20.01.0 \
     --output_hdf amgma_test.output.hdf \
     -profile testing \
     -resume
+    
+NXF_VER=20.01.0 \
+    nextflow \
+    run \
+    align.nf \
+    -with-docker ubuntu:18.04 \
+    -w work/ \
+    --geneshot_hdf data/geneshot.summary.hdf5 \
+    --geneshot_dmnd data/geneshot.dmnd \
+    --db testing_output/db/amgma.tar \
+    --output_folder testing_output/align \
+    --output_hdf amgma_test.output.hdf \
+    --details \
+    -profile testing \
+    -resume
