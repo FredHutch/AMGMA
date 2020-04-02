@@ -662,6 +662,7 @@ process combineResults {
 
 import pandas as pd
 import os
+import shutil
 
 # Read in and combine all of the containment tables
 containment_csv_list = "${containment_shard_csv_gz_list}".split(" ")
@@ -676,8 +677,13 @@ containment_df = pd.concat([
 ])
 print("Read in containment for %d genomes and %d CAGs" % (containment_df["genome"].unique().shape[0], containment_df["CAG"].unique().shape[0]))
 
+# Rename the geneshot output HDF5 as the output HDF5
+# All of the results will be appended to this object
+# which will retain all of the formatting of the original
+shutil.copyfile("${geneshot_hdf}", "${params.output_hdf}")
+
 # Open a connection to the output file
-output_store = pd.HDFStore("${params.output_hdf}", "w")
+output_store = pd.HDFStore("${params.output_hdf}", "a")
 
 # Write out the genome manifest to the final HDF5
 print("Writing out the manifest to HDF")
@@ -758,30 +764,6 @@ for parameter_name, genome_summary_list in parameter_summaries.items():
         format = "fixed",
         complevel = 5
     )
-
-# Copy everything from the input HDF5
-with pd.HDFStore("${geneshot_hdf}", "r") as input_store:
-
-    for k in input_store:
-        if k == "/abund/cag/wide" or k == "/annot/gene/all":
-            pd.read_hdf(
-                input_store,
-                k
-            ).to_hdf(
-                output_store,
-                k,
-                format = "table",
-                data_columns = ["CAG"]
-            )
-        else:
-            pd.read_hdf(
-                input_store,
-                k
-            ).to_hdf(
-                output_store,
-                k,
-                format = "fixed"
-            )
 
 output_store.close()
 
