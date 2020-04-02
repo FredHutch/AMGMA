@@ -481,7 +481,7 @@ process calculateContainment {
         file geneshot_hdf
 
     output:
-        file "genome_containment_shard.*.csv.gz" into containment_shard_csv_gz
+        file "genome_containment_shard.*.csv.gz" optional true into containment_shard_csv_gz
 
 """
 #!/usr/bin/env python3
