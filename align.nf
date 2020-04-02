@@ -40,8 +40,9 @@ The output from this pipeline is an HDF file which contains all of the data from
 input HDF, as well as the additional tables,
 
 * /genomes/manifest
+* /genomes/cags/containment
 * /genomes/summary/<feature>
-* /genomes/detail/<feature>/<genome_id>
+* /genomes/detail/<feature>/<genome_id> (Included with --details)
 
 for each <feature> tested in the input, and for each <genome_id> in the database
     """.stripIndent()
