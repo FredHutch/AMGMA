@@ -167,6 +167,7 @@ diamond \
     -k 1 \
     --compress 1 \
     --unal 0 \
+    --very-sensitive \
     --query-gencode 11 \
     --range-culling \
     -F 1
