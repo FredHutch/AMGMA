@@ -137,7 +137,7 @@ echo "Done"
 process alignGenomes {
     tag "Annotate reference genomes by alignment"
     container "${container_diamond}"
-    label "mem_medium"
+    label "mem_veryhigh"
     errorStrategy 'retry'
 
     input:
