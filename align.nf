@@ -6,7 +6,7 @@ params.db = null
 params.geneshot_hdf = null
 params.geneshot_fasta = null
 params.output_hdf = null
-params.min_coverage = 80
+params.min_coverage = 50
 params.min_identity = 80
 params.fdr_method = "fdr_bh"
 params.alpha = 0.2
@@ -167,10 +167,12 @@ diamond \
     -k 1 \
     --compress 1 \
     --unal 0 \
-    --very-sensitive \
+    --sensitive \
     --query-gencode 11 \
     --range-culling \
-    -F 1
+    -F 1 \
+    --block-size ${task.memory.toMega() / (1024 * 6 * task.attempt)} \
+
 
 """
 }
