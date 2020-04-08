@@ -8,6 +8,7 @@ params.geneshot_fasta = null
 params.output_hdf = null
 params.min_coverage = 50
 params.min_identity = 80
+params.top = 10
 params.fdr_method = "fdr_bh"
 params.alpha = 0.2
 params.details = false
@@ -34,6 +35,7 @@ Optional Arguments:
 --details             Include additional detailed results in output (see below)
 --min_coverage        Minimum coverage required for alignment (default: 80)
 --min_identity        Minimum percent identity required for alignment (default: 80)
+--top                 Threshold used to retain overlapping alignments within --top% score of the max (default: 10)
 --fdr_method          Method used for FDR correction (default: fdr_bh)
 --alpha               Alpha value used for FDR correction (default: 0.2)
 
@@ -164,7 +166,7 @@ diamond \
     --outfmt 6 qseqid sseqid pident length qstart qend qlen sstart send slen \
     --id ${params.min_identity} \
     --subject-cover ${params.min_coverage} \
-    -k 1 \
+    --top ${params.top} \
     --compress 1 \
     --unal 0 \
     --sensitive \
