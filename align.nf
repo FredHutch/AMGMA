@@ -517,6 +517,10 @@ print("Read in sizes of %d CAGs containing %d genes" % (gene_cag_map["CAG"].uniq
 print("Reading in ${header_csv_gz}")
 contig_headers = pd.read_csv(
     "${header_csv_gz}"
+).groupby(
+    "contig"
+).head(
+    1
 ).set_index(
     "contig"
 )["genome"]
