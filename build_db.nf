@@ -254,11 +254,17 @@ for fp in *.fasta.gz; do
 
     echo \$fp
 
-    # Add the contigs to a concatenated file
-    cat \$fp >> combined_genomes.fasta.gz
-
     # Get the genome ID from the file name
     genome_name=\$( echo \$fp | sed 's/.fasta.gz//' )
+
+    # Add the genome ID to the contig headers
+    gunzip -c \$fp | \
+        sed "s/>/>\${genome_name}_/" | \
+        gzip -c > \$fp.TEMP
+    mv \$fp.TEMP \$fp
+
+    # Add the contigs to a concatenated file
+    cat \$fp >> combined_genomes.fasta.gz
 
     # Add a line to the CSV with the genome ID and the contig header name
     gunzip -c \$fp | fgrep '>' | sed "s/>/\$genome_name,/" | sed 's/ .*//' >> combined_genomes.csv
