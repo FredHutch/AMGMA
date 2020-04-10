@@ -8,7 +8,7 @@ params.geneshot_fasta = null
 params.output_hdf = null
 params.min_coverage = 50
 params.min_identity = 50
-params.top = 10
+params.top = 50
 params.fdr_method = "fdr_bh"
 params.alpha = 0.2
 params.details = false
@@ -35,7 +35,7 @@ Optional Arguments:
 --details             Include additional detailed results in output (see below)
 --min_coverage        Minimum coverage required for alignment (default: 50)
 --min_identity        Minimum percent identity required for alignment (default: 50)
---top                 Threshold used to retain overlapping alignments within --top% score of the max (default: 10)
+--top                 Threshold used to retain overlapping alignments within --top% score of the max score (default: 50)
 --fdr_method          Method used for FDR correction (default: fdr_bh)
 --alpha               Alpha value used for FDR correction (default: 0.2)
 
@@ -364,6 +364,10 @@ print("Analyzing parameter: %s" % (parameter_name))
 print("Reading in ${header_csv_gz}")
 contig_headers = pd.read_csv(
     "${header_csv_gz}"
+).groupby(
+    "contig"
+).head(
+    1
 ).set_index(
     "contig"
 )["genome"]
