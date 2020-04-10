@@ -364,11 +364,9 @@ print("Analyzing parameter: %s" % (parameter_name))
 print("Reading in ${header_csv_gz}")
 contig_headers = pd.read_csv(
     "${header_csv_gz}"
-).groupby(
-    "contig"
-).head(
-    1
-).set_index(
+)
+assert contig_headers["contig"].unique().shape[0] == contig_headers.shape[0], "Found duplicate contig names"
+contig_headers = contig_headers.set_index(
     "contig"
 )["genome"]
 
@@ -521,11 +519,9 @@ print("Read in sizes of %d CAGs containing %d genes" % (gene_cag_map["CAG"].uniq
 print("Reading in ${header_csv_gz}")
 contig_headers = pd.read_csv(
     "${header_csv_gz}"
-).groupby(
-    "contig"
-).head(
-    1
-).set_index(
+)
+assert contig_headers["contig"].unique().shape[0] == contig_headers.shape[0], "Found duplicate contig names"
+contig_headers = contig_headers.set_index(
     "contig"
 )["genome"]
 
