@@ -17,10 +17,8 @@ After each microbial gene has been associated with outcome of interest (such
 as a particular human disease), then those association metrics can be summarized
 over a set of microbial genomes by:
 
-  1. Aligning the reference genes against each genome, and
-  2. Calculating summary metrics for each genome, such as:
-    * Proportion of the genome passing FDR filter for association
-    * Average estimated coefficient of association for those genes
+  1. Aligning the reference genes against each genome,
+  2. Calculating summary metrics for each genome using both the consistency and magnitude of assocation for each gene it contains, and
   3. Formatting a genome 'map' showing the relative physical location for those genes throughout the genome
 
 ### Running AMGMA
@@ -77,8 +75,9 @@ Required Arguments:
 
 Optional Arguments:
 --details             Include additional detailed results in output (see below)
---min_coverage        Minimum coverage required for alignment (default: 80)
---min_identity        Minimum percent identity required for alignment (default: 80)
+--min_coverage        Minimum coverage required for alignment (default: 50)
+--min_identity        Minimum percent identity required for alignment (default: 50)
+--top                 Threshold used to retain overlapping alignments within --top% score of the max score (default: 50)
 --fdr_method          Method used for FDR correction (default: fdr_bh)
 --alpha               Alpha value used for FDR correction (default: 0.2)
 
@@ -131,7 +130,9 @@ of the reference genomes, along with the position of those genes in the genome.
 We do this by directly aligning each reference genome against the gene catalog,
 using conceptual six-frame translation with DIAMOND in 'blastx' mode and only
 retaining alignments which are the highest scoring for each predicted coding
-region of the genome. After that alignment step, we then summarize each genome
+region of the genome. Genomes are aligned in parallel in batches, which also
+protects against any sensitivity degradation which might be caused by large
+query size. After that alignment step, we then summarize each genome
 on the basis of the estimated coefficient and FDR-corrected p-value for each
 catalog gene.
 
