@@ -100,7 +100,7 @@ workflow {
 // Validate that all genomes are unique in the manifest
 process validateManifest {
     tag "Enforce unique genome IDs"
-    container "quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed"
+    container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
     label 'io_limited'
     errorStrategy 'retry'
 

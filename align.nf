@@ -14,7 +14,7 @@ params.alpha = 0.2
 params.details = false
 
 // Commonly used containers
-container__pandas = "quay.io/fhcrc-microbiome/python-pandas@sha256:b57953e513f1f797522f88fa6afca187cdd190ca90181fa91846caa66bdeb5ed"
+container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
 container_diamond = "quay.io/fhcrc-microbiome/docker-diamond:v0.9.31--3"
 
 // Function which prints help message text
