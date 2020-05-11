@@ -222,9 +222,9 @@ with pd.HDFStore(store_fp, "r") as store:
 #######################
 
 # Filter down to the mu estimates
-corncob_df = corncob_df.loc[
-    corncob_df["parameter"].apply(lambda s: s.startswith("mu."))
-]
+corncob_df = corncob_df.reindex(
+    index=corncob_df["estimate"].dropna().index
+)
 print("Corncob results have %d rows for mu" % (corncob_df.shape[0]))
 assert corncob_df.shape[0] > 0
 
@@ -235,12 +235,15 @@ corncob_df = corncob_df.loc[
 print("Corncob results have %d non-intercept rows for mu" % (corncob_df.shape[0]))
 assert corncob_df.shape[0] > 0
 
-# Remove the "mu." from the parameter
-corncob_df["parameter"] = corncob_df["parameter"].apply(lambda s: s[3:])
+# Replace "(Intercept)" with "Intercept" in the parameter table
+corncob_df.replace(
+    to_replace=dict([("parameter", dict([("(Intercept)", "Intercept")]))]),
+    inplace=True
+)
 
 # Reformat the corncob results as a dict
 corncob_dict = dict([
-    (parameter, parameter_df.pivot_table(index="CAG", columns="type", values="value"))
+    (parameter, parameter_df.set_index("CAG"))
     for parameter, parameter_df in corncob_df.groupby("parameter")
 ])
 
