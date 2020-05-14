@@ -358,7 +358,7 @@ print("All done!")
 process formatResults {
     tag "Use alignment information to summarize results"
     container "${container__pandas}"
-    label 'io_limited'
+    label 'mem_medium'
     errorStrategy "retry"
 
     input:
