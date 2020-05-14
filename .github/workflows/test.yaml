@@ -48,9 +48,17 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run build_db.nf -with-docker ubuntu:18.04 -w work/ --manifest data/genome.manifest.csv --output_folder db --output_prefix amgma -profile testing --batchsize 2 
         working-directory: /tmp/
+      - name:  Build Second Database
+        run: |
+          cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run build_db.nf -with-docker ubuntu:18.04 -w work/ --manifest data/genome.batch2.manifest.csv --output_folder db.batch2 --output_prefix amgma.batch2 -profile testing --batchsize 2 
+        working-directory: /tmp/
       - name:  Align Results
         run: |
           cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run align.nf -with-docker ubuntu:18.04 -w work/ --geneshot_hdf data/geneshot.summary.hdf5 --geneshot_dmnd data/geneshot.dmnd --db db/amgma.tar --output_folder output --output_hdf amgma_test.output.hdf -profile testing 
+        working-directory: /tmp/
+      - name:  Align Multiple Results
+        run: |
+          cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run align.nf -with-docker ubuntu:18.04 -w work/ --geneshot_hdf data/geneshot.summary.hdf5 --geneshot_dmnd data/geneshot.dmnd --db db/amgma.tar,db.batch2/amgma.batch2.tar --output_folder output_multiple --output_hdf amgma_test.output.hdf -profile testing 
         working-directory: /tmp/
       - name:  Align Results with Details
         run: |
