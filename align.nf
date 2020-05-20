@@ -11,6 +11,7 @@ params.min_identity = 50
 params.top = 50
 params.fdr_method = "fdr_bh"
 params.alpha = 0.2
+params.filter = false
 params.details = false
 
 // Commonly used containers
@@ -32,6 +33,8 @@ Required Arguments:
 --output_hdf          Name of the output HDF file to write to the output folder
 
 Optional Arguments:
+--filter              Only analyze parameters which contain the specified substring
+                      (Example: --filter BMI will only analyze the covariate matching "*BMI*", even if others are present)
 --details             Include additional detailed results in output (see below)
 --min_coverage        Minimum coverage required for alignment (default: 50)
 --min_identity        Minimum percent identity required for alignment (default: 50)
@@ -286,10 +289,18 @@ corncob_df.replace(
 )
 
 # Reformat the corncob results as a dict
-corncob_dict = dict([
-    (parameter, parameter_df.set_index("CAG"))
-    for parameter, parameter_df in corncob_df.groupby("parameter")
-])
+corncob_dict = dict()
+
+# Only include parameters which match the --filter, if any:
+for parameter, parameter_df in corncob_df.groupby("parameter"):
+    if "${params.filter}" == "false" or "${params.filter}" in parameter:
+        print("Including parameter: %s" % parameter)
+        corncob_dict[parameter] = parameter_df.set_index("CAG")
+
+    else:
+        print("NOT Including parameter: %s (does not contain %s)" % (parameter, "${params.filter}"))
+
+assert len(corncob_dict) > 0, "Did not find any parameters to include"
 
 # Add in the FDR threshold
 for parameter in corncob_dict:

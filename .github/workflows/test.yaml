@@ -64,3 +64,7 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run align.nf -with-docker ubuntu:18.04 -w work/ --geneshot_hdf data/geneshot.summary.hdf5 --geneshot_dmnd data/geneshot.dmnd --db db/amgma.tar --output_folder output --output_hdf amgma_test.output.detailed.hdf -profile testing --details
         working-directory: /tmp/
+      - name:  Align Results with Filter
+        run: |
+          cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run align.nf -with-docker ubuntu:18.04 -w work/ --geneshot_hdf data/geneshot.summary.hdf5 --geneshot_dmnd data/geneshot.dmnd --db db/amgma.tar --output_folder output --output_hdf amgma_test.output.filtered.hdf -profile testing --filter label1
+        working-directory: /tmp/
