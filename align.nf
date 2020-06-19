@@ -311,7 +311,7 @@ df = df.assign(
 print("Filtered down to %d alignments with coverage >= ${params.min_coverage}" % df.shape[0])
 
 # Write out
-df.to_csv("${aln_tsv_gz}.filtered.tsv.gz", sep="\\t")
+df.to_csv("${aln_tsv_gz}.filtered.tsv.gz", sep="\\t", index=None, header=None)
 
 """
     }
