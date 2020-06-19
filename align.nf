@@ -346,7 +346,7 @@ if (params.blast) {
         --range-culling \
         -F 1 \
         --block-size ${task.memory.toMega() / (1024 * 6 * task.attempt)} \
-
+        --threads ${task.cpus} \
 
     """
     }
