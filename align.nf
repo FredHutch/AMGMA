@@ -265,7 +265,7 @@ if (params.blast) {
         -query ${database_chunk_tar.name.replaceAll(/.tar/, ".fasta.gz")} \
         -db blastDB \
         -query_gencode 11 \
-        -outfmt 6 qseqid sseqid pident length qstart qend qlen sstart send slen \
+        -outfmt "6 qseqid sseqid pident length qstart qend qlen sstart send slen" \
         -num_threads ${task.cpus} \
         -max_target_seqs 10000000 \
         -evalue 0.001 \
