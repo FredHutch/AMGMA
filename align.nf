@@ -223,7 +223,9 @@ if (params.blast) {
 
         set -e
 
-        makeblastdb -in ${ref_fasta} -dbtype prot -out blastDB
+        gunzip -c ${ref_fasta} > ref.fasta
+
+        makeblastdb -in ref.fasta -dbtype prot -out blastDB
         """
     }
 
