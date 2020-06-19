@@ -247,7 +247,7 @@ if (params.blast) {
 
         input:
             file database_chunk_tar from database_tar_list.flatten()
-            file "blastDB*" from blastDB.toSortedList()
+            file "*" from blastDB
 
         output:
             tuple file("${database_chunk_tar.name.replaceAll(/.tar/, ".aln.gz")}"), file("${database_chunk_tar.name.replaceAll(/.tar/, ".csv.gz")}") into raw_alignment_ch
@@ -262,7 +262,7 @@ if (params.blast) {
     tar xvf ${database_chunk_tar}
 
     blastx \
-        -query ${database_chunk_tar.name.replaceAll(/.tar/, ".fasta.gz")} \
+        -query <(gunzip -c ${database_chunk_tar.name.replaceAll(/.tar/, ".fasta.gz")}) \
         -db blastDB \
         -query_gencode 11 \
         -outfmt "6 qseqid sseqid pident length qstart qend qlen sstart send slen" \
