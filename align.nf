@@ -196,14 +196,14 @@ if (params.blast) {
             file geneshot_dmnd
         
         output:
-            file "ref.fasta" into ref_fasta
+            file "ref.fasta.gz" into ref_fasta
 
 
         """#!/bin/bash
 
         set -e
 
-        diamond getseq ${geneshot_dmnd} > ref.fasta
+        diamond getseq --db ${geneshot_dmnd} --out ref.fasta.gz --compress 1
         """
     }
 
@@ -223,11 +223,16 @@ if (params.blast) {
 
         set -e
 
+        echo "Decompressing gene catalog FASTA"
+        gunzip -c ${ref_fasta} > ref.fasta
+
         echo "Head of gene catalog FASTA"
-        head ${ref_fasta}
+        head ref.fasta
 
         echo "Building database"
-        makeblastdb -in ${ref_fasta} -dbtype prot -out blastDB
+        makeblastdb -in ref.fasta -dbtype prot -out blastDB
+
+        echo "Done"
         """
     }
 
