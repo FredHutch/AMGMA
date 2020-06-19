@@ -286,34 +286,34 @@ if (params.blast) {
         output:
             tuple file("${aln_tsv_gz}.filtered.tsv.gz"), file("${header_csv_gz}") into alignments_ch_1, alignments_ch_2
 
-    """#!/usr/bin/env python3
+"""#!/usr/bin/env python3
 
-    import pandas as pd
+import pandas as pd
 
-    # Read in the table of hits
-    df = pd.read_csv("${aln_tsv_gz}", sep="\\t", header=None)
-    print("Read in %d alignments" % df.shape[0])
+# Read in the table of hits
+df = pd.read_csv("${aln_tsv_gz}", sep="\\t", header=None)
+print("Read in %d alignments" % df.shape[0])
 
-    # Filter by percent identity
-    df = df.loc[
-        df[2] >= ${params.min_identity}
-    ]
-    print("Filtered down to %d alignments with identity >= ${params.min_identity}" % df.shape[0])
+# Filter by percent identity
+df = df.loc[
+    df[2] >= ${params.min_identity}
+]
+print("Filtered down to %d alignments with identity >= ${params.min_identity}" % df.shape[0])
 
-    # Filter by coverage
-    df = df.assign(
-        coverage = 100 * df[3] / df[9]
-    ).query(
-        "coverage >= ${params.min_coverage}"
-    ).drop(
-        columns = "coverage"
-    )
-    print("Filtered down to %d alignments with coverage >= ${params.min_coverage}" % df.shape[0])
+# Filter by coverage
+df = df.assign(
+    coverage = 100 * df[3] / df[9]
+).query(
+    "coverage >= ${params.min_coverage}"
+).drop(
+    columns = "coverage"
+)
+print("Filtered down to %d alignments with coverage >= ${params.min_coverage}" % df.shape[0])
 
-    # Write out
-    df.to_csv("${aln_tsv_gz}.filtered.tsv.gz", sep="\\t")
+# Write out
+df.to_csv("${aln_tsv_gz}.filtered.tsv.gz", sep="\\t")
 
-    """
+"""
     }
 
 } else {
