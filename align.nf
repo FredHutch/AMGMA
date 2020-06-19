@@ -203,7 +203,9 @@ if (params.blast) {
 
         set -e
 
-        diamond getseq --db ${geneshot_dmnd} --out ref.fasta.gz --compress 1
+        diamond getseq --db ${geneshot_dmnd} --out ref.fasta
+
+        gzip ref.fasta
         """
     }
 
