@@ -13,10 +13,12 @@ params.fdr_method = "fdr_bh"
 params.alpha = 0.2
 params.filter = false
 params.details = false
+params.blast = false
 
 // Commonly used containers
 container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3_py38_ubuntu"
 container_diamond = "quay.io/fhcrc-microbiome/docker-diamond:v0.9.31--3"
+container__blast = "ncbi/blast:2.10.1"
 
 // Function which prints help message text
 def helpMessage() {
@@ -41,6 +43,7 @@ Optional Arguments:
 --top                 Threshold used to retain overlapping alignments within --top% score of the max score (default: 50)
 --fdr_method          Method used for FDR correction (default: fdr_bh)
 --alpha               Alpha value used for FDR correction (default: 0.2)
+--blast               Align with BLAST+ instead of DIAMOND
 
 Output HDF:
 The output from this pipeline is an HDF file which contains all of the data from the
@@ -182,48 +185,172 @@ manifest_df.to_csv("database_manifest.csv", index=None)
 }
 
 
-// Align the genomes against the database
-process alignGenomes {
-    tag "Annotate reference genomes by alignment"
-    container "${container_diamond}"
-    label "mem_veryhigh"
-    errorStrategy 'retry'
+// If using BLAST+, format the database
+if (params.blast) {
+    // Convert the gene catalog from DMND to FASTA
+    process extractFASTA {
+        container "${container_diamond}"
+        label "io_limited"
 
-    input:
-        file database_chunk_tar from database_tar_list.flatten()
-        file geneshot_dmnd
+        input:
+            file geneshot_dmnd
+        
+        output:
+            file "ref.fasta.gz" into ref_fasta
 
-    output:
-        tuple file("${database_chunk_tar.name.replaceAll(/.tar/, ".aln.gz")}"), file("${database_chunk_tar.name.replaceAll(/.tar/, ".csv.gz")}") into alignments_ch_1, alignments_ch_2
 
-"""
-#!/bin/bash
+        """#!/bin/bash
 
-set -e
+        set -e
 
-ls -lahtr
+        diamond getseq ${geneshot_dmnd} | gzip -c > ref.fasta.gz
+        """
+    }
 
-tar xvf ${database_chunk_tar}
+    // Format the BLAST database
+    process makeBLASTdb {
+        container "${container__blast}"
+        label "mem_medium"
 
-diamond \
+        input:
+            file ref_fasta
+        
+        output:
+            file "blastDB*" into blastDB
+
+
+        """#!/bin/bash
+
+        set -e
+
+        makeblastdb -in ${ref_fasta} -dbtype prot -out blastDB
+        """
+    }
+
+    // Align the genomes against the database with BLAST
+    process alignGenomesBLAST {
+        tag "Annotate reference genomes by alignment"
+        container "${container__blast}"
+        label "mem_medium"
+        errorStrategy 'retry'
+
+        input:
+            file database_chunk_tar from database_tar_list.flatten()
+            file "blastDB*" from blastDB.toSortedList()
+
+        output:
+            tuple file("${database_chunk_tar.name.replaceAll(/.tar/, ".aln.gz")}"), file("${database_chunk_tar.name.replaceAll(/.tar/, ".csv.gz")}") into raw_alignment_ch
+
+    """
+    #!/bin/bash
+
+    set -e
+
+    ls -lahtr
+
+    tar xvf ${database_chunk_tar}
+
     blastx \
-    --db ${geneshot_dmnd} \
-    --query ${database_chunk_tar.name.replaceAll(/.tar/, ".fasta.gz")} \
-    --out ${database_chunk_tar.name.replaceAll(/.tar/, ".aln.gz")} \
-    --outfmt 6 qseqid sseqid pident length qstart qend qlen sstart send slen \
-    --id ${params.min_identity} \
-    --subject-cover ${params.min_coverage} \
-    --top ${params.top} \
-    --compress 1 \
-    --unal 0 \
-    --sensitive \
-    --query-gencode 11 \
-    --range-culling \
-    -F 1 \
-    --block-size ${task.memory.toMega() / (1024 * 6 * task.attempt)} \
+        -query ${database_chunk_tar.name.replaceAll(/.tar/, ".fasta.gz")} \
+        -db blastDB \
+        -query_gencode 11 \
+        -outfmt 6 qseqid sseqid pident length qstart qend qlen sstart send slen \
+        -num_threads ${task.cpus} \
+        -max_target_seqs 10000000 \
+        -evalue 0.001 \
+        gzip -c > ${database_chunk_tar.name.replaceAll(/.tar/, ".aln.gz")}
+
+    """
+    }
+
+    // Filter alignments by percent identity and coverage of the gene catalog entry
+    process filterBLASThits {
+        container "${container__pandas}"
+        label "mem_medium"
+        errorStrategy 'retry'
+
+        input:
+            tuple file(aln_tsv_gz), file(header_csv_gz) from raw_alignment_ch
+
+        output:
+            tuple file("${aln_tsv_gz}.filtered.tsv.gz"), file("${header_csv_gz}") into alignments_ch_1, alignments_ch_2
+
+    """#!/usr/bin/env python3
+
+    import pandas as pd
+
+    # Read in the table of hits
+    df = pd.read_csv("${aln_tsv_gz}", sep="\\t", header=None)
+    print("Read in %d alignments" % df.shape[0])
+
+    # Filter by percent identity
+    df = df.loc[
+        df[2] >= ${params.min_identity}
+    ]
+    print("Filtered down to %d alignments with identity >= ${params.min_identity}" % df.shape[0])
+
+    # Filter by coverage
+    df = df.assign(
+        coverage = 100 * df[3] / df[9]
+    ).query(
+        "coverage >= ${params.min_coverage}"
+    ).drop(
+        columns = "coverage"
+    )
+    print("Filtered down to %d alignments with coverage >= ${params.min_coverage}" % df.shape[0])
+
+    # Write out
+    df.to_csv("${aln_tsv_gz}.filtered.tsv.gz", sep="\\t")
+
+    """
+    }
+
+} else {
+
+    // Align the genomes against the database with DIAMOND
+    process alignGenomes {
+        tag "Annotate reference genomes by alignment"
+        container "${container_diamond}"
+        label "mem_veryhigh"
+        errorStrategy 'retry'
+
+        input:
+            file database_chunk_tar from database_tar_list.flatten()
+            file geneshot_dmnd
+
+        output:
+            tuple file("${database_chunk_tar.name.replaceAll(/.tar/, ".aln.gz")}"), file("${database_chunk_tar.name.replaceAll(/.tar/, ".csv.gz")}") into alignments_ch_1, alignments_ch_2
+
+    """
+    #!/bin/bash
+
+    set -e
+
+    ls -lahtr
+
+    tar xvf ${database_chunk_tar}
+
+    diamond \
+        blastx \
+        --db ${geneshot_dmnd} \
+        --query ${database_chunk_tar.name.replaceAll(/.tar/, ".fasta.gz")} \
+        --out ${database_chunk_tar.name.replaceAll(/.tar/, ".aln.gz")} \
+        --outfmt 6 qseqid sseqid pident length qstart qend qlen sstart send slen \
+        --id ${params.min_identity} \
+        --subject-cover ${params.min_coverage} \
+        --top ${params.top} \
+        --compress 1 \
+        --unal 0 \
+        --sensitive \
+        --query-gencode 11 \
+        --range-culling \
+        -F 1 \
+        --block-size ${task.memory.toMega() / (1024 * 6 * task.attempt)} \
 
 
-"""
+    """
+    }
+
 }
 
 // Check to make sure that the input HDF has the required entries

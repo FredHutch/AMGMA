@@ -56,6 +56,10 @@ jobs:
         run: |
           cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run align.nf -with-docker ubuntu:18.04 -w work/ --geneshot_hdf data/geneshot.summary.hdf5 --geneshot_dmnd data/geneshot.dmnd --db db/amgma.tar --output_folder output --output_hdf amgma_test.output.hdf -profile testing 
         working-directory: /tmp/
+      - name:  Align with BLAST
+        run: |
+          cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run align.nf -with-docker ubuntu:18.04 -w work/ --geneshot_hdf data/geneshot.summary.hdf5 --geneshot_dmnd data/geneshot.dmnd --db db/amgma.tar --output_folder output_blast --output_hdf amgma_test.output.blast.hdf --blast -profile testing 
+        working-directory: /tmp/
       - name:  Align Multiple Results
         run: |
           cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run align.nf -with-docker ubuntu:18.04 -w work/ --geneshot_hdf data/geneshot.summary.hdf5 --geneshot_dmnd data/geneshot.dmnd --db db/amgma.tar,db.batch2/amgma.batch2.tar --output_folder output_multiple --output_hdf amgma_test.output.hdf -profile testing 
