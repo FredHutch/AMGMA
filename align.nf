@@ -269,7 +269,7 @@ if (params.blast) {
         -num_threads ${task.cpus} \
         -max_target_seqs 10000000 \
         -evalue 0.001 \
-        gzip -c > ${database_chunk_tar.name.replaceAll(/.tar/, ".aln.gz")}
+        | gzip -c > ${database_chunk_tar.name.replaceAll(/.tar/, ".aln.gz")}
 
     """
     }
