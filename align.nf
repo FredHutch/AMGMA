@@ -14,6 +14,7 @@ params.alpha = 0.2
 params.filter = false
 params.details = false
 params.blast = false
+params.no_associations = false
 
 // Commonly used containers
 container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3_py38_ubuntu"
@@ -44,6 +45,7 @@ Optional Arguments:
 --fdr_method          Method used for FDR correction (default: fdr_bh)
 --alpha               Alpha value used for FDR correction (default: 0.2)
 --blast               Align with BLAST+ instead of DIAMOND
+--no_associations     Exclude all analysis of CAG association metrics
 
 Output HDF:
 The output from this pipeline is an HDF file which contains all of the data from the
@@ -364,313 +366,6 @@ df.to_csv("${aln_tsv_gz}.filtered.tsv.gz", sep="\\t", index=None, header=None)
 
 }
 
-// Check to make sure that the input HDF has the required entries
-process parseAssociations {
-    tag "Extract gene association data for the study"
-    container "${container__pandas}"
-    label 'mem_veryhigh'
-    errorStrategy "retry"
-
-    input:
-        file geneshot_hdf
-    
-    output:
-        file "gene_associations.*.csv.gz" into gene_association_csv_ch
-    
-"""
-#!/usr/bin/env python3
-
-import pandas as pd
-from statsmodels.stats.multitest import multipletests
-
-store_fp = "${geneshot_hdf}"
-print("Reading data from %s" % store_fp)
-
-###################
-# READ INPUT DATA #
-###################
-
-with pd.HDFStore(store_fp, "r") as store:
-
-    for k in ["/stats/cag/corncob", "/annot/gene/all"]:
-        assert k in store, "Could not find %s in %s" % (k, store_fp)
-
-    print("Reading /stats/cag/corncob")
-    corncob_df = pd.read_hdf(store, "/stats/cag/corncob")
-
-    print("Reading /annot/gene/all")
-    annot_df = pd.read_hdf(store, "/annot/gene/all")
-
-
-#######################
-# FORMAT CORNCOB DATA #
-#######################
-
-# Filter down to the mu estimates
-corncob_df = corncob_df.reindex(
-    index=corncob_df["estimate"].dropna().index
-)
-print("Corncob results have %d rows for mu" % (corncob_df.shape[0]))
-assert corncob_df.shape[0] > 0
-
-# Remove the intercept values
-corncob_df = corncob_df.loc[
-    corncob_df["parameter"] != "mu.(Intercept)"
-]
-print("Corncob results have %d non-intercept rows for mu" % (corncob_df.shape[0]))
-assert corncob_df.shape[0] > 0
-
-# Replace "(Intercept)" with "Intercept" in the parameter table
-corncob_df.replace(
-    to_replace=dict([("parameter", dict([("(Intercept)", "Intercept")]))]),
-    inplace=True
-)
-
-# Reformat the corncob results as a dict
-corncob_dict = dict()
-
-# Only include parameters which match the --filter, if any:
-for parameter, parameter_df in corncob_df.groupby("parameter"):
-    if "${params.filter}" == "false" or "${params.filter}" in parameter:
-        print("Including parameter: %s" % parameter)
-        corncob_dict[parameter] = parameter_df.set_index("CAG")
-
-    else:
-        print("NOT Including parameter: %s (does not contain %s)" % (parameter, "${params.filter}"))
-
-assert len(corncob_dict) > 0, "Did not find any parameters to include"
-
-# Add in the FDR threshold
-for parameter in corncob_dict:
-    corncob_dict[
-        parameter
-    ][
-        "${params.fdr_method}"
-    ] = multipletests(
-        corncob_dict[parameter]["p_value"].fillna(1),
-        ${params.alpha},
-        "${params.fdr_method}"
-    )[1]
-
-print("Processing %d parameters: %s" % (
-    corncob_df["parameter"].unique().shape[0],
-    ", ".join(corncob_df["parameter"].unique())
-))
-
-#########################
-# FORMAT CAG MEMBERSHIP #
-#########################
-
-# Make sure the CAG gene membership table has values
-print("CAG membership table has %d rows" % (annot_df.shape[0]))
-assert annot_df.shape[0] > 0
-
-# Make sure the expected columns exist
-assert "CAG" in annot_df.columns.values and "gene" in annot_df.columns.values
-
-# Make sure that every CAG in the corncob results has an entry in the gene membership table
-cag_set = set(annot_df["CAG"].tolist())
-for cag_id in corncob_df["CAG"].unique():
-    assert cag_id in cag_set, "Could not find genes for CAG %s" % cag_id
-
-######################
-# FORMAT OUTPUT DATA #
-######################
-
-# For each parameter, write out a table with the association for each gene
-for parameter, cag_assoc in corncob_dict.items():
-    print("Processing %s" % parameter)
-    
-    # Make a gene-level association table
-    gene_assoc = annot_df.copy()
-
-    # Add the CAG-level associations
-    for k in cag_assoc.columns.values:
-        gene_assoc[k] = gene_assoc["CAG"].apply(
-            cag_assoc[k].get
-        )
-    # Write out to CSV
-    gene_assoc.to_csv(
-        "gene_associations.%s.csv.gz" % parameter,
-        index = None,
-        compression = "gzip",
-        sep = ","
-    )
-
-
-print("All done!")
-"""
-}
-
-
-// Format the results for each shard
-process formatResults {
-    tag "Use alignment information to summarize results"
-    container "${container__pandas}"
-    label 'mem_medium'
-    errorStrategy "retry"
-
-    input:
-        tuple file(aln_tsv_gz), file(header_csv_gz) from alignments_ch_1
-        each file(gene_association_csv) from gene_association_csv_ch.flatten()
-    
-    output:
-        file "genome_association_shard.*.hdf5" into association_shard_hdf
-    
-"""
-#!/usr/bin/env python3
-
-import gzip
-import pandas as pd
-
-##########################
-# READ GENE ASSOCIATIONS #
-##########################
-
-gene_assoc_df = pd.read_csv(
-    "${gene_association_csv}",
-    sep = ",",
-    compression = "gzip"
-).set_index(
-    "gene"
-)
-
-
-########################
-# PARSE PARAMETER NAME #
-########################
-
-# Parse the parameter name from the gene association CSV file name
-assert "${gene_association_csv}".startswith("gene_associations.")
-assert "${gene_association_csv}".endswith(".csv.gz")
-parameter_name = "${gene_association_csv}".replace(
-    "gene_associations.", ""
-).replace(
-    ".csv.gz", ""
-)
-
-print("Analyzing parameter: %s" % (parameter_name))
-
-
-#######################
-# READ CONTIG HEADERS #
-#######################
-
-# Dict mapping contig names to genome IDs
-print("Reading in ${header_csv_gz}")
-contig_headers = pd.read_csv(
-    "${header_csv_gz}"
-)
-assert contig_headers["contig"].unique().shape[0] == contig_headers.shape[0], "Found duplicate contig names"
-contig_headers = contig_headers.set_index(
-    "contig"
-)["genome"]
-
-##########################
-# FORMAT GENE ALIGNMENTS #
-##########################
-
-# Read in the alignments of reference genomes against the gene catalog genes
-print("Reading in ${aln_tsv_gz}")
-aln_df = pd.read_csv(
-    "${aln_tsv_gz}", 
-    sep="\\t", 
-    header=None,
-    compression="gzip",
-    names = [
-        "contig", "gene", "pident", "length", "contig_start", "contig_end", "contig_len", "gene_start", "gene_end", "gene_len"
-    ]
-)
-
-print("Adding genome labels")
-aln_df = aln_df.assign(
-    genome_id = aln_df["contig"].apply(contig_headers.get)
-)
-if aln_df["genome_id"].isnull().sum() > 0:
-    print("Missing genome labels for these headers:")
-    print(aln_df.loc[
-        aln_df["genome_id"].isnull()
-    ])
-assert aln_df["genome_id"].isnull().sum() == 0
-
-print("Read in %d gene alignments for %d genomes" % (aln_df.shape[0], aln_df["genome_id"].unique().shape[0]))
-
-
-###################
-# ANALYZE GENOMES #
-###################
-
-# Open a connection to the HDF store used for all output information
-output_store = pd.HDFStore("genome_association_shard.%s.${header_csv_gz.name.replaceAll(/.csv.gz/, "")}.hdf5" % parameter_name, "w")
-
-# Function to process a single genome
-def process_genome(genome_id, genome_aln_df):
-
-    # Add in the gene annotations
-    for k in gene_assoc_df.columns.values:
-
-        # To annotate the genome, figure out which of the catalog genes
-        # each of the genes in the genome is most similar to, and then
-        # fill in the value of the CAG which that catalog gene is a part of
-
-        genome_aln_df[k] = genome_aln_df[
-            "gene"
-        ].apply(
-            gene_assoc_df[k].get
-        )
-
-    if "${params.details}" == "true":
-        # Write out the full table
-        key = "/genomes/detail/%s/%s" % (parameter_name, genome_id)
-        print("Writing out to %s" % key)
-        
-        genome_aln_df.drop(
-            columns = "genome_id"
-        ).to_hdf(
-            output_store,
-            key,
-            format = "fixed",
-            complevel = 5
-        )
-
-    # Get the table which passes the FDR filter
-    genome_aln_df_fdr = genome_aln_df.loc[
-        genome_aln_df["${params.fdr_method}"] <= ${params.alpha}
-    ]
-
-    print("%d / %d genes pass the CAG-level FDR threshold" % 
-        (genome_aln_df_fdr.shape[0], genome_aln_df.shape[0]))
-
-    # Return the summary metrics
-    return dict([
-        ("genome_id", genome_id),
-        ("parameter", parameter_name),
-        ("total_genes", genome_aln_df.shape[0]),
-        ("n_pass_fdr", genome_aln_df_fdr.shape[0]),
-        ("prop_pass_fdr", genome_aln_df_fdr.shape[0] / float(genome_aln_df.shape[0])),
-        ("mean_est_coef", genome_aln_df_fdr["estimate"].mean())
-    ])
-
-# Iterate over every genome and process it, saving the summary to the HDF
-pd.DataFrame([
-    process_genome(genome_id, genome_df)
-    for genome_id, genome_df in aln_df.groupby("genome_id")
-]).to_hdf(
-    output_store,
-    "/genomes/summary/%s" % parameter_name,
-    format = "fixed"
-)
-
-
-######################
-# CLOSE OUTPUT FILES #
-######################
-
-output_store.close()
-
-"""
-}
-
 
 // Calculate the containment of each CAG in each genome
 process calculateContainment {
@@ -843,27 +538,334 @@ else:
 
 }
 
+// Join all of the results of the containment calculation
 containment_shard_csv_gz_list = containment_shard_csv_gz.toSortedList()
-association_shard_hdf_list = association_shard_hdf.toSortedList()
 
-// Collect results and combine across all shards
-process combineResults {
-    tag "Make a single output HDF"
-    container "${container__pandas}"
-    label 'mem_veryhigh'
-    errorStrategy "retry"
+if (params.no_associations == false){
 
-    input:
-        file containment_shard_csv_gz_list
-        file association_shard_hdf_list
-        file geneshot_hdf
-        file manifest_csv from valid_manifest_ch
+    // Check to make sure that the input HDF has the required entries
+    process parseAssociations {
+        tag "Extract gene association data for the study"
+        container "${container__pandas}"
+        label 'mem_veryhigh'
+        errorStrategy "retry"
+
+        input:
+            file geneshot_hdf
+        
+        output:
+            file "gene_associations.*.csv.gz" into gene_association_csv_ch
+        
+    """#!/usr/bin/env python3
+
+import pandas as pd
+from statsmodels.stats.multitest import multipletests
+
+store_fp = "${geneshot_hdf}"
+print("Reading data from %s" % store_fp)
+
+###################
+# READ INPUT DATA #
+###################
+
+with pd.HDFStore(store_fp, "r") as store:
+
+    for k in ["/stats/cag/corncob", "/annot/gene/all"]:
+        assert k in store, "Could not find %s in %s" % (k, store_fp)
+
+    print("Reading /stats/cag/corncob")
+    corncob_df = pd.read_hdf(store, "/stats/cag/corncob")
+
+    print("Reading /annot/gene/all")
+    annot_df = pd.read_hdf(store, "/annot/gene/all")
+
+
+#######################
+# FORMAT CORNCOB DATA #
+#######################
+
+# Filter down to the mu estimates
+corncob_df = corncob_df.reindex(
+    index=corncob_df["estimate"].dropna().index
+)
+print("Corncob results have %d rows for mu" % (corncob_df.shape[0]))
+assert corncob_df.shape[0] > 0
+
+# Remove the intercept values
+corncob_df = corncob_df.loc[
+    corncob_df["parameter"] != "mu.(Intercept)"
+]
+print("Corncob results have %d non-intercept rows for mu" % (corncob_df.shape[0]))
+assert corncob_df.shape[0] > 0
+
+# Replace "(Intercept)" with "Intercept" in the parameter table
+corncob_df.replace(
+    to_replace=dict([("parameter", dict([("(Intercept)", "Intercept")]))]),
+    inplace=True
+)
+
+# Reformat the corncob results as a dict
+corncob_dict = dict()
+
+# Only include parameters which match the --filter, if any:
+for parameter, parameter_df in corncob_df.groupby("parameter"):
+    if "${params.filter}" == "false" or "${params.filter}" in parameter:
+        print("Including parameter: %s" % parameter)
+        corncob_dict[parameter] = parameter_df.set_index("CAG")
+
+    else:
+        print("NOT Including parameter: %s (does not contain %s)" % (parameter, "${params.filter}"))
+
+assert len(corncob_dict) > 0, "Did not find any parameters to include"
+
+# Add in the FDR threshold
+for parameter in corncob_dict:
+    corncob_dict[
+        parameter
+    ][
+        "${params.fdr_method}"
+    ] = multipletests(
+        corncob_dict[parameter]["p_value"].fillna(1),
+        ${params.alpha},
+        "${params.fdr_method}"
+    )[1]
+
+print("Processing %d parameters: %s" % (
+    corncob_df["parameter"].unique().shape[0],
+    ", ".join(corncob_df["parameter"].unique())
+))
+
+#########################
+# FORMAT CAG MEMBERSHIP #
+#########################
+
+# Make sure the CAG gene membership table has values
+print("CAG membership table has %d rows" % (annot_df.shape[0]))
+assert annot_df.shape[0] > 0
+
+# Make sure the expected columns exist
+assert "CAG" in annot_df.columns.values and "gene" in annot_df.columns.values
+
+# Make sure that every CAG in the corncob results has an entry in the gene membership table
+cag_set = set(annot_df["CAG"].tolist())
+for cag_id in corncob_df["CAG"].unique():
+    assert cag_id in cag_set, "Could not find genes for CAG %s" % cag_id
+
+######################
+# FORMAT OUTPUT DATA #
+######################
+
+# For each parameter, write out a table with the association for each gene
+for parameter, cag_assoc in corncob_dict.items():
+    print("Processing %s" % parameter)
     
-    output:
-        file "${params.output_hdf}" into final_hdf
-    
-"""
-#!/usr/bin/env python3
+    # Make a gene-level association table
+    gene_assoc = annot_df.copy()
+
+    # Add the CAG-level associations
+    for k in cag_assoc.columns.values:
+        gene_assoc[k] = gene_assoc["CAG"].apply(
+            cag_assoc[k].get
+        )
+    # Write out to CSV
+    gene_assoc.to_csv(
+        "gene_associations.%s.csv.gz" % parameter,
+        index = None,
+        compression = "gzip",
+        sep = ","
+    )
+
+
+print("All done!")
+    """
+    }
+
+
+    // Format the results for each shard
+    process formatResults {
+        tag "Use alignment information to summarize results"
+        container "${container__pandas}"
+        label 'mem_medium'
+        errorStrategy "retry"
+
+        input:
+            tuple file(aln_tsv_gz), file(header_csv_gz) from alignments_ch_1
+            each file(gene_association_csv) from gene_association_csv_ch.flatten()
+        
+        output:
+            file "genome_association_shard.*.hdf5" into association_shard_hdf
+        
+    """#!/usr/bin/env python3
+
+import gzip
+import pandas as pd
+
+##########################
+# READ GENE ASSOCIATIONS #
+##########################
+
+gene_assoc_df = pd.read_csv(
+    "${gene_association_csv}",
+    sep = ",",
+    compression = "gzip"
+).set_index(
+    "gene"
+)
+
+
+########################
+# PARSE PARAMETER NAME #
+########################
+
+# Parse the parameter name from the gene association CSV file name
+assert "${gene_association_csv}".startswith("gene_associations.")
+assert "${gene_association_csv}".endswith(".csv.gz")
+parameter_name = "${gene_association_csv}".replace(
+    "gene_associations.", ""
+).replace(
+    ".csv.gz", ""
+)
+
+print("Analyzing parameter: %s" % (parameter_name))
+
+
+#######################
+# READ CONTIG HEADERS #
+#######################
+
+# Dict mapping contig names to genome IDs
+print("Reading in ${header_csv_gz}")
+contig_headers = pd.read_csv(
+    "${header_csv_gz}"
+)
+assert contig_headers["contig"].unique().shape[0] == contig_headers.shape[0], "Found duplicate contig names"
+contig_headers = contig_headers.set_index(
+    "contig"
+)["genome"]
+
+##########################
+# FORMAT GENE ALIGNMENTS #
+##########################
+
+# Read in the alignments of reference genomes against the gene catalog genes
+print("Reading in ${aln_tsv_gz}")
+aln_df = pd.read_csv(
+    "${aln_tsv_gz}", 
+    sep="\\t", 
+    header=None,
+    compression="gzip",
+    names = [
+        "contig", "gene", "pident", "length", "contig_start", "contig_end", "contig_len", "gene_start", "gene_end", "gene_len"
+    ]
+)
+
+print("Adding genome labels")
+aln_df = aln_df.assign(
+    genome_id = aln_df["contig"].apply(contig_headers.get)
+)
+if aln_df["genome_id"].isnull().sum() > 0:
+    print("Missing genome labels for these headers:")
+    print(aln_df.loc[
+        aln_df["genome_id"].isnull()
+    ])
+assert aln_df["genome_id"].isnull().sum() == 0
+
+print("Read in %d gene alignments for %d genomes" % (aln_df.shape[0], aln_df["genome_id"].unique().shape[0]))
+
+
+###################
+# ANALYZE GENOMES #
+###################
+
+# Open a connection to the HDF store used for all output information
+output_store = pd.HDFStore("genome_association_shard.%s.${header_csv_gz.name.replaceAll(/.csv.gz/, "")}.hdf5" % parameter_name, "w")
+
+# Function to process a single genome
+def process_genome(genome_id, genome_aln_df):
+
+    # Add in the gene annotations
+    for k in gene_assoc_df.columns.values:
+
+        # To annotate the genome, figure out which of the catalog genes
+        # each of the genes in the genome is most similar to, and then
+        # fill in the value of the CAG which that catalog gene is a part of
+
+        genome_aln_df[k] = genome_aln_df[
+            "gene"
+        ].apply(
+            gene_assoc_df[k].get
+        )
+
+    if "${params.details}" == "true":
+        # Write out the full table
+        key = "/genomes/detail/%s/%s" % (parameter_name, genome_id)
+        print("Writing out to %s" % key)
+        
+        genome_aln_df.drop(
+            columns = "genome_id"
+        ).to_hdf(
+            output_store,
+            key,
+            format = "fixed",
+            complevel = 5
+        )
+
+    # Get the table which passes the FDR filter
+    genome_aln_df_fdr = genome_aln_df.loc[
+        genome_aln_df["${params.fdr_method}"] <= ${params.alpha}
+    ]
+
+    print("%d / %d genes pass the CAG-level FDR threshold" % 
+        (genome_aln_df_fdr.shape[0], genome_aln_df.shape[0]))
+
+    # Return the summary metrics
+    return dict([
+        ("genome_id", genome_id),
+        ("parameter", parameter_name),
+        ("total_genes", genome_aln_df.shape[0]),
+        ("n_pass_fdr", genome_aln_df_fdr.shape[0]),
+        ("prop_pass_fdr", genome_aln_df_fdr.shape[0] / float(genome_aln_df.shape[0])),
+        ("mean_est_coef", genome_aln_df_fdr["estimate"].mean())
+    ])
+
+# Iterate over every genome and process it, saving the summary to the HDF
+pd.DataFrame([
+    process_genome(genome_id, genome_df)
+    for genome_id, genome_df in aln_df.groupby("genome_id")
+]).to_hdf(
+    output_store,
+    "/genomes/summary/%s" % parameter_name,
+    format = "fixed"
+)
+
+
+######################
+# CLOSE OUTPUT FILES #
+######################
+
+output_store.close()
+    """
+    }
+
+    association_shard_hdf_list = association_shard_hdf.toSortedList()
+
+    // Collect results and combine across all shards
+    process combineResults {
+        tag "Make a single output HDF"
+        container "${container__pandas}"
+        label 'mem_veryhigh'
+        errorStrategy "retry"
+
+        input:
+            file containment_shard_csv_gz_list
+            file association_shard_hdf_list
+            file geneshot_hdf
+            file manifest_csv from valid_manifest_ch
+        
+        output:
+            file "${params.output_hdf}" into final_hdf
+        
+    """#!/usr/bin/env python3
 
 import pandas as pd
 import os
@@ -972,8 +974,77 @@ for parameter_name, genome_summary_list in parameter_summaries.items():
 
 output_store.close()
 
-"""
+    """
+    }
+} else {
+    // Collect results and combine across all shards
+    process combineResults {
+        tag "Make a single output HDF"
+        container "${container__pandas}"
+        label 'mem_veryhigh'
+        errorStrategy "retry"
+
+        input:
+            file containment_shard_csv_gz_list
+            file geneshot_hdf
+            file manifest_csv from valid_manifest_ch
+        
+        output:
+            file "${params.output_hdf}" into final_hdf
+        
+    """#!/usr/bin/env python3
+
+import pandas as pd
+import os
+import shutil
+
+# Read in and combine all of the containment tables
+containment_csv_list = "${containment_shard_csv_gz_list}".split(" ")
+print("Reading in containment values from %d files" % len(containment_csv_list))
+containment_df = pd.concat([
+    pd.read_csv(
+        fp,
+        sep = ",",
+        compression = "gzip"
+    )
+    for fp in containment_csv_list
+])
+print("Read in containment for %d genomes and %d CAGs" % (containment_df["genome"].unique().shape[0], containment_df["CAG"].unique().shape[0]))
+
+# Rename the geneshot output HDF5 as the output HDF5
+# All of the results will be appended to this object
+# which will retain all of the formatting of the original
+shutil.copyfile("${geneshot_hdf}", "${params.output_hdf}")
+
+# Open a connection to the output file
+output_store = pd.HDFStore("${params.output_hdf}", "a")
+
+# Write out the genome manifest to the final HDF5
+print("Writing out the manifest to HDF")
+pd.read_csv(
+    "${manifest_csv}"
+).drop(
+    columns = "uri"
+).to_hdf(
+    output_store,
+    "/genomes/manifest"
+)
+
+# Write out the combined containment table
+print("Writing out the containment to HDF")
+containment_df.to_hdf(
+    output_store,
+    "/genomes/cags/containment",
+    format = "table",
+    data_columns = ["genome", "CAG"]
+)
+
+output_store.close()
+
+    """
+    }
 }
+
 
 
 // Repack an HDF5 file
