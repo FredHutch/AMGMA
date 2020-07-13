@@ -978,7 +978,7 @@ output_store.close()
     }
 } else {
     // Collect results and combine across all shards
-    process combineResults {
+    process combineResultsNoAssoc {
         tag "Make a single output HDF"
         container "${container__pandas}"
         label 'mem_veryhigh'
