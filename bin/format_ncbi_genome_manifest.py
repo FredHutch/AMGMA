@@ -111,5 +111,20 @@ format_ncbi_genome_manifest.py \
         axis=1
     )
 
+    # Drop duplicates
+    vc = df["id"].value_counts()
+    if (vc > 1).sum() > 0:
+        logging.info(
+            "Dropping {:,} duplicated records".format(
+                (vc > 1).sum()
+            )
+        )
+        df = df.drop_duplicates()
+        assert df["id"].value_counts().max() == 1
+
     # Write out to a file
     df.to_csv(fpo, index=None)
+
+    logging.info("Wrote out {:,} genomes to {}".format(
+        df.shape[0], fpo
+    ))
