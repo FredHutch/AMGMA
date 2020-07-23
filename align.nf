@@ -371,7 +371,7 @@ df.to_csv("${aln_tsv_gz}.filtered.tsv.gz", sep="\\t", index=None, header=None)
 process calculateContainment {
     tag "Overlap between CAGs and genomes"
     container "${container__pandas}"
-    label 'mem_medium'
+    label 'mem_veryhigh'
     errorStrategy 'retry'
 
     input:
