@@ -558,7 +558,7 @@ def filter_alignment(genome_df, min_cag_size=5, min_cag_prop=0.25):
         CAG_prop = df["CAG"].apply(
             lambda cag_id: cag_genes_found[cag_id] / cag_size[cag_id]
         ).query(
-            "CAG_prop >= %s" % min_cag_prop
+            "CAG_prop >= %s" % ${params.min_cag_prop}
         ).drop(
             columns="CAG_prop"
         )
@@ -795,11 +795,11 @@ import pandas as pd
 gene_assoc_df = pd.read_csv(
     "${gene_association_csv}",
     sep = ",",
-    compression = "gzip"
+    compression = "gzip",
+    dtype = dict(CAG=int)
 ).set_index(
     "gene"
 )
-
 
 ######################
 # CALCULATE CAG SIZE #
@@ -874,12 +874,15 @@ aln_df = aln_df.assign(
 print("%d / %d genes have a valid CAG label" % (aln_df["CAG"].dropna().shape[0], aln_df.shape[0]))
 assert aln_df["CAG"].isnull().sum() < aln_df.shape[0]
 aln_df = aln_df.assign(
-    has_CAG = aln_df["CAG"].apply(lambda cag_id: cag_id is not None)
+    has_CAG = aln_df["CAG"].apply(lambda cag_id: pd.isnull(cag_id) is False)
 ).query(
     "has_CAG"
 ).drop(
     columns="has_CAG"
 )
+
+# Format the CAG as an integer
+aln_df["CAG"] = aln_df["CAG"].apply(int)
 
 print("Read in %d gene alignments for %d genomes" % (aln_df.shape[0], aln_df["genome_id"].unique().shape[0]))
 
@@ -899,13 +902,13 @@ def filter_alignments(genome_aln_df):
             cag_size.get
         )
     ).query(
-        "CAG_size >= %d" % min_cag_size
+        "CAG_size >= %d" % ${params.min_cag_size}
     ).drop(
         columns="CAG_size"
     )
 
     # Stop if no alignments pass this filter
-    if genome_aln_df_fdr.shape[0] == 0:
+    if genome_aln_df.shape[0] == 0:
         return
 
     # Calculate the number of unique genes from each CAG which was found
@@ -921,11 +924,11 @@ def filter_alignments(genome_aln_df):
     genome_aln_df = genome_aln_df.assign(
         CAG_prop = genome_aln_df["CAG"].apply(
             lambda cag_id: cag_genes_found[cag_id] / cag_size[cag_id]
-        ).query(
-            "CAG_prop >= %s" % min_cag_prop
-        ).drop(
-            columns="CAG_prop"
         )
+    ).query(
+        "CAG_prop >= %s" % ${params.min_cag_prop}
+    ).drop(
+        columns="CAG_prop"
     )
 
     # Stop if no alignments pass this filter
@@ -946,7 +949,7 @@ def filter_alignments(genome_aln_df):
         )
 
     # Make sure that we have the Wald metric
-    if "wald" not in genome_aln_df_fdr.columns.values:
+    if "wald" not in genome_aln_df.columns.values:
         genome_aln_df = genome_aln_df.assign(
             wald = genome_aln_df["estimate"] / genome_aln_df["std_error"]
         )
@@ -956,7 +959,9 @@ def filter_alignments(genome_aln_df):
 
 # Filter and annotate each genome
 aln_df = [
-    filter_alignments(genome_df)
+    filter_alignments(genome_df).assign(
+        genome_id = genome_id
+    )
     for genome_id, genome_df in aln_df.groupby("genome_id")
 ]
 
@@ -964,7 +969,7 @@ aln_df = [
 aln_df = [v for v in aln_df if v is not None]
 
 # Make a DataFrame
-aln_df = pd.DataFrame(aln_df)
+aln_df = pd.concat(aln_df)
 
 
 ###################
@@ -1026,7 +1031,7 @@ if len(summary_df) > 0:
 ########################
 
 # Compute a rolling window for the Wald metric across the genome
-for genome_id, genome_df in aln_df.groupy("genome_id"):
+for genome_id, genome_df in aln_df.groupby("genome_id"):
 
     # Format the rolling window across every contig
     pd.concat([
