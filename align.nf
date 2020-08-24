@@ -557,11 +557,11 @@ def filter_alignment(genome_df, min_cag_size=5, min_cag_prop=0.25):
     df = df.assign(
         CAG_prop = df["CAG"].apply(
             lambda cag_id: cag_genes_found[cag_id] / cag_size[cag_id]
-        ).query(
-            "CAG_prop >= %s" % ${params.min_cag_prop}
-        ).drop(
-            columns="CAG_prop"
         )
+    ).query(
+        "CAG_prop >= %s" % ${params.min_cag_prop}
+    ).drop(
+        columns="CAG_prop"
     )
 
     # Stop if no alignments pass this filter
