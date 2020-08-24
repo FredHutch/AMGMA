@@ -959,9 +959,7 @@ def filter_alignments(genome_aln_df):
 
 # Filter and annotate each genome
 aln_df = [
-    filter_alignments(genome_df).assign(
-        genome_id = genome_id
-    )
+    filter_alignments(genome_df)
     for genome_id, genome_df in aln_df.groupby("genome_id")
 ]
 
