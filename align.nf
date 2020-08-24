@@ -7,7 +7,7 @@ params.geneshot_hdf = null
 params.geneshot_fasta = null
 params.output_hdf = null
 params.min_coverage = 50
-params.min_identity = 50
+params.min_identity = 90
 params.top = 50
 params.fdr_method = "fdr_bh"
 params.alpha = 0.2
@@ -40,7 +40,7 @@ Optional Arguments:
                       (Example: --filter BMI will only analyze the covariate matching "*BMI*", even if others are present)
 --details             Include additional detailed results in output (see below)
 --min_coverage        Minimum coverage required for alignment (default: 50)
---min_identity        Minimum percent identity required for alignment (default: 50)
+--min_identity        Minimum percent identity required for alignment (default: 90)
 --top                 Threshold used to retain overlapping alignments within --top% score of the max score (default: 50)
 --fdr_method          Method used for FDR correction (default: fdr_bh)
 --alpha               Alpha value used for FDR correction (default: 0.2)
