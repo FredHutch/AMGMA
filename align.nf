@@ -1105,8 +1105,11 @@ output_store.close()
     """#!/usr/bin/env python3
 
 import pandas as pd
+import pickle
 import os
 import shutil
+
+pickle.HIGHEST_PROTOCOL = 4
 
 # Read in and combine all of the containment tables
 containment_csv_list = [
@@ -1261,8 +1264,11 @@ output_store.close()
     """#!/usr/bin/env python3
 
 import pandas as pd
+import pickle
 import os
 import shutil
+
+pickle.HIGHEST_PROTOCOL = 4
 
 # Read in and combine all of the containment tables
 containment_csv_list = "${containment_shard_csv_gz_list}".split(" ")
