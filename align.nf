@@ -1093,8 +1093,8 @@ output_store.close()
         errorStrategy "retry"
 
         input:
-            file containment_shard_csv_gz_list
-            file association_shard_hdf_list
+            file "containment_shard.*.csv.gz" from containment_shard_csv_gz_list
+            file "association_shard.*.hdf5" from association_shard_hdf_list
             file geneshot_hdf
             file manifest_csv from valid_manifest_ch
         
@@ -1108,7 +1108,11 @@ import os
 import shutil
 
 # Read in and combine all of the containment tables
-containment_csv_list = "${containment_shard_csv_gz_list}".split(" ")
+containment_csv_list = [
+    fp
+    for fp in os.listdir(".")
+    if fp.startswith("containment_shard.") and fp.endswith(".csv.gz")
+]
 print("Reading in containment values from %d files" % len(containment_csv_list))
 containment_df = pd.concat([
     pd.read_csv(
@@ -1152,7 +1156,12 @@ containment_df.to_hdf(
 parameter_summaries = dict()
 
 # Iterate over each of the parameter association shards
-for hdf_fp in "${association_shard_hdf_list}".split(" "):
+association_shard_hdf_list = [
+    fp
+    for fp in os.listdir(".")
+    if fp.startswith("association_shard") and fp.endswith(".hdf5")
+]
+for hdf_fp in association_shard_hdf_list:
 
     # Open a connection to the input
     with pd.HDFStore(hdf_fp, "r") as store:
