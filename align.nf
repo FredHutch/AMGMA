@@ -870,12 +870,17 @@ print("Adding CAG labels")
 aln_df = aln_df.assign(
     CAG = aln_df["gene"].apply(gene_assoc_df["CAG"].get)
 )
-if aln_df["CAG"].isnull().sum() > 0:
-    print("Missing CAG labels for these genes:")
-    print(aln_df.loc[
-        aln_df["CAG"].isnull()
-    ])
-assert aln_df["CAG"].isnull().sum() == 0
+
+# Remove any genes which don't have a CAG label
+print("%d / %d genes have a valid CAG label" % (aln_df["CAG"].dropna().shape[0], aln_df.shape[0]))
+assert aln_df["CAG"].isnull().sum() < aln_df.shape[0]
+aln_df = aln_df.assign(
+    has_CAG = aln_df["CAG"].apply(lambda cag_id: cag_id is not None)
+).query(
+    "has_CAG"
+).drop(
+    columns="has_CAG"
+)
 
 print("Read in %d gene alignments for %d genomes" % (aln_df.shape[0], aln_df["genome_id"].unique().shape[0]))
 
