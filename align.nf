@@ -927,10 +927,10 @@ def filter_alignments(genome_aln_df):
         )
 
     # Make sure that we have the Wald metric
-    if "wald" not in genome_aln_df_fdr.columns.values
-    genome_aln_df = genome_aln_df.assign(
-        wald = genome_aln_df["estimate"] / genome_aln_df["std_error"]
-    )
+    if "wald" not in genome_aln_df_fdr.columns.values:
+        genome_aln_df = genome_aln_df.assign(
+            wald = genome_aln_df["estimate"] / genome_aln_df["std_error"]
+        )
 
     # Return the filtered alignments
     return genome_aln_df
