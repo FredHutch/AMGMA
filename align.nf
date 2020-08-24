@@ -15,6 +15,9 @@ params.filter = false
 params.details = false
 params.blast = false
 params.no_associations = false
+params.min_cag_size = 5
+params.min_cag_prop = 0.25
+params.window_size = 5
 
 // Commonly used containers
 container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3_py38_ubuntu"
@@ -46,17 +49,21 @@ Optional Arguments:
 --alpha               Alpha value used for FDR correction (default: 0.2)
 --blast               Align with BLAST+ instead of DIAMOND
 --no_associations     Exclude all analysis of CAG association metrics
+--min_cag_size        Only include details for CAGs containing at least this number of genes (default: 5)
+--min_cag_prop        Only include details for CAGs which align with this proportion of genes to a given genome (default: 0.25)
+--window_size         Size of rolling window (for /genomes/map/<feature>/<genome_id>) (default: 5 [adjacent genes])
 
 Output HDF:
 The output from this pipeline is an HDF file which contains all of the data from the
 input HDF, as well as the additional tables,
 
-* /genomes/manifest
-* /genomes/cags/containment
-* /genomes/summary/<feature>
-* /genomes/detail/<feature>/<genome_id> (Included with --details)
+* /genomes/manifest (Table with the description of all genomes used for alignment)
+* /genomes/cags/containment (Table with the number of genes aligned for all CAGs against all genomes)
+* /genomes/detail/<genome_id> (Table with the coordinates of all aligned genes for a given genome)
+* /genomes/annotation/<genome_id> (Table with the annotations from optional GFF input)
+* /genomes/summary/<feature> (Table with summary metrics for each genome based on gene-level association with a given parameter)
+* /genomes/map/<feature>/<genome_id> (Table with rolling window average of parameter association across the genome)
 
-for each <feature> tested in the input, and for each <genome_id> in the database
     """.stripIndent()
 }
 
@@ -380,6 +387,7 @@ process calculateContainment {
 
     output:
         file "genome_containment_shard.*.csv.gz" optional true into containment_shard_csv_gz
+        file "genome_containment_shard.*.hdf5" optional true into genome_alignment_shards
 
 """
 #!/usr/bin/env python3
@@ -401,6 +409,13 @@ gene_cag_map = pd.read_hdf(
     "gene"
 )
 print("Read in sizes of %d CAGs containing %d genes" % (gene_cag_map["CAG"].unique().shape[0], gene_cag_map.shape[0]))
+
+######################
+# CALCULATE CAG SIZE #
+######################
+
+# Make a single dictionary with the number of genes in each CAG
+cag_size = gene_cag_map["CAG"].value_counts()
 
 #######################
 # READ CONTIG HEADERS #
@@ -514,6 +529,48 @@ for genome_id, genome_df in aln_df.groupby("genome_id"):
         )["CAG"].value_counts().items()
     ])
 
+# Function to write out a set of alignments
+def filter_alignment(genome_df, min_cag_size=5, min_cag_prop=0.25):
+
+    # Filter genes based on CAG size
+    df = genome_df.assign(
+        CAG_size = genome_df["CAG"].apply(cag_size.get)
+    ).query(
+        "CAG_size >= %d" % min_cag_size
+    ).drop(
+        columns="CAG_size"
+    )
+
+    # Stop if no alignments pass this filter
+    if df.shape[0] == 0:
+        return
+
+    # Calculate the number of unique genes from each CAG which was found
+    cag_genes_found = df.reindex(
+        columns=["gene", "CAG"]
+    ).drop_duplicates(
+    )[
+        "CAG"
+    ].value_counts()
+
+    # Filter genes based on the proportion of each CAG which was found
+    df = df.assign(
+        CAG_prop = df["CAG"].apply(
+            lambda cag_id: cag_genes_found[cag_id] / cag_size[cag_id]
+        ).query(
+            "CAG_prop >= %s" % min_cag_prop
+        ).drop(
+            columns="CAG_prop"
+        )
+    )
+
+    # Stop if no alignments pass this filter
+    if df.shape[0] == 0:
+        return
+
+    # Return the filtered table
+    return df
+
 # If no containment has been found, skip the summary step
 if len(genome_containment) == 0:
     print("No matching genomes, skipping")
@@ -533,6 +590,37 @@ else:
         compression = "gzip",
         index = None
     )
+
+    # If --details has been specified, write out the map of alignments for each genome
+    if "${params.details}" != "false":
+
+        # First compute the filtered alignment for each genome
+        filtered_alignments = {
+            genome_id: filter_alignment(
+                genome_df,
+                min_cag_size=${params.min_cag_size},
+                min_cag_prop=${params.min_cag_prop},
+            )
+            for genome_id, genome_df in aln_df.groupby("genome_id")
+        }
+
+        # Remove the genomes which did not survive filtering
+        filtered_alignments = {
+            k: v
+            for k, v in filtered_alignments.items()
+            if v is not None
+        }
+
+        # If any remain, write to HDF
+        if len(filtered_alignments) > 0:
+
+            hdf_fp = "genome_containment_shard.${header_csv_gz.name}.hdf5"
+            with pd.HDFStore(hdf_fp, "w") as store:
+                for genome_id, genome_df in filtered_alignments.items():
+                    genome_df.to_hdf(
+                        store,
+                        "/genomes/detail/%s" % genome_id
+                    )
 
 """
 
@@ -713,6 +801,14 @@ gene_assoc_df = pd.read_csv(
 )
 
 
+######################
+# CALCULATE CAG SIZE #
+######################
+
+# Make a single dictionary with the number of genes in each CAG
+cag_size = gene_assoc_df["CAG"].value_counts()
+
+
 ########################
 # PARSE PARAMETER NAME #
 ########################
@@ -773,16 +869,50 @@ assert aln_df["genome_id"].isnull().sum() == 0
 print("Read in %d gene alignments for %d genomes" % (aln_df.shape[0], aln_df["genome_id"].unique().shape[0]))
 
 
-###################
-# ANALYZE GENOMES #
-###################
+#####################
+# FILTER ALIGNMENTS #
+#####################
 
-# Open a connection to the HDF store used for all output information
-output_store = pd.HDFStore("genome_association_shard.%s.${header_csv_gz.name.replaceAll(/.csv.gz/, "")}.hdf5" % parameter_name, "w")
+# Function to filter a set of alignments
+def filter_alignments(genome_aln_df):
 
-# Function to process a single genome
-def process_genome(genome_id, genome_aln_df):
+    # Filter genes based on CAG size
+    genome_aln_df = genome_aln_df.assign(
+        CAG_size = genome_aln_df["CAG"].apply(cag_size.get)
+    ).query(
+        "CAG_size >= %d" % min_cag_size
+    ).drop(
+        columns="CAG_size"
+    )
 
+    # Stop if no alignments pass this filter
+    if genome_aln_df_fdr.shape[0] == 0:
+        return
+
+    # Calculate the number of unique genes from each CAG which was found
+    cag_genes_found = genome_aln_df.reset_index(
+    ).reindex(
+        columns=["gene", "CAG"]
+    ).drop_duplicates(
+    )[
+        "CAG"
+    ].value_counts()
+
+    # Filter genes based on the proportion of each CAG which was found
+    genome_aln_df = genome_aln_df.assign(
+        CAG_prop = genome_aln_df["CAG"].apply(
+            lambda cag_id: cag_genes_found[cag_id] / cag_size[cag_id]
+        ).query(
+            "CAG_prop >= %s" % min_cag_prop
+        ).drop(
+            columns="CAG_prop"
+        )
+    )
+
+    # Stop if no alignments pass this filter
+    if genome_aln_df.shape[0] == 0:
+        return
+    
     # Add in the gene annotations
     for k in gene_assoc_df.columns.values:
 
@@ -796,19 +926,37 @@ def process_genome(genome_id, genome_aln_df):
             gene_assoc_df[k].get
         )
 
-    if "${params.details}" == "true":
-        # Write out the full table
-        key = "/genomes/detail/%s/%s" % (parameter_name, genome_id)
-        print("Writing out to %s" % key)
-        
-        genome_aln_df.drop(
-            columns = "genome_id"
-        ).to_hdf(
-            output_store,
-            key,
-            format = "fixed",
-            complevel = 5
-        )
+    # Make sure that we have the Wald metric
+    if "wald" not in genome_aln_df_fdr.columns.values
+    genome_aln_df = genome_aln_df.assign(
+        wald = genome_aln_df["estimate"] / genome_aln_df["std_error"]
+    )
+
+    # Return the filtered alignments
+    return genome_aln_df
+
+# Filter and annotate each genome
+aln_df = [
+    filter_alignments(genome_df)
+    for genome_id, genome_df in aln_df.groupby("genome_id")
+]
+
+# Remove null values
+aln_df = [v for v in aln_df if v is not None]
+
+# Make a DataFrame
+aln_df = pd.DataFrame(aln_df)
+
+
+###################
+# ANALYZE GENOMES #
+###################
+
+# Open a connection to the HDF store used for all output information
+output_store = pd.HDFStore("genome_association_shard.%s.${header_csv_gz.name.replaceAll(/.csv.gz/, "")}.hdf5" % parameter_name, "w")
+
+# Function to summarize a single genome
+def process_genome(genome_id, genome_aln_df):
 
     # Get the table which passes the FDR filter
     genome_aln_df_fdr = genome_aln_df.loc[
@@ -817,6 +965,10 @@ def process_genome(genome_id, genome_aln_df):
 
     print("%d / %d genes pass the CAG-level FDR threshold" % 
         (genome_aln_df_fdr.shape[0], genome_aln_df.shape[0]))
+
+    # Stop if no alignments pass this filter
+    if genome_aln_df_fdr.shape[0] == 0:
+        return
 
     # Return the summary metrics
     return dict([
@@ -828,15 +980,54 @@ def process_genome(genome_id, genome_aln_df):
         ("mean_est_coef", genome_aln_df_fdr["estimate"].mean())
     ])
 
-# Iterate over every genome and process it, saving the summary to the HDF
-pd.DataFrame([
+# Iterate over every genome and process it
+summary_df = [
     process_genome(genome_id, genome_df)
     for genome_id, genome_df in aln_df.groupby("genome_id")
-]).to_hdf(
-    output_store,
-    "/genomes/summary/%s" % parameter_name,
-    format = "fixed"
-)
+]
+
+summary_df = [v for v in summary_df if v is not None]
+
+# Check that we have any data to save
+if len(summary_df) > 0:
+
+    # Make a DataFrame
+    summary_df = pd.DataFrame(summary_df)
+
+    # Save to the HDF
+    summary_df.to_hdf(
+        output_store,
+        "/genomes/summary/%s" % parameter_name,
+        format = "fixed"
+    )
+
+
+########################
+# WRITE OUT GENOME MAP #
+########################
+
+# Compute a rolling window for the Wald metric across the genome
+for genome_id, genome_df in aln_df.groupy("genome_id"):
+
+    # Format the rolling window across every contig
+    pd.concat([
+        contig_df.sort_values(
+            by="contig_start"
+        ).reindex(
+            columns=["contig_start", "wald", "estimate", "p_value"]
+        ).rolling(
+            ${params.window_size},
+        ).median(
+        ).dropna(
+        ).assign(
+            contig=contig_id,
+            genome=genome_id,
+        )
+        for contig_id, contig_df in genome_df.groupby("contig")
+    ]).to_hdf(
+        output_store,
+        "/genomes/map/%s/%s" % (parameter_name, genome_id)
+    )
 
 
 ######################
@@ -939,7 +1130,7 @@ for hdf_fp in "${association_shard_hdf_list}".split(" "):
                 )
 
             # Write genome detailed information
-            elif k.startswith("/genomes/detail/"):
+            elif k.startswith(("/genomes/detail/", "/genomes/map/")):
                 print("Copying %s to output HDF" % k)
 
                 pd.read_hdf(
@@ -988,6 +1179,7 @@ output_store.close()
             file containment_shard_csv_gz_list
             file geneshot_hdf
             file manifest_csv from valid_manifest_ch
+            file "genome_alignments.*.hdf5" from genome_alignment_shards.toSortedList()
         
         output:
             file "${params.output_hdf}" into final_hdf
@@ -1038,6 +1230,25 @@ containment_df.to_hdf(
     format = "table",
     data_columns = ["genome", "CAG"]
 )
+
+# Write out the genome maps, if there are any
+for fp in os.listdir("."):
+
+    # Parse any files with matching filenames
+    if fp.startswith("genome_alignments.") and fp.endswith(".hdf5"):
+
+        # Open up the file
+        with pd.HDFStore(fp, "r") as input_store:
+
+            # Iterate over every table
+            for k in input_store:
+
+                # Read in the table
+                df = pd.read_hdf(input_store, k)
+
+                # Write to the output HDF
+                print("Writing alignment details for %s" % k)
+                df.to_hdf(output_store, k)
 
 output_store.close()
 
