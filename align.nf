@@ -967,7 +967,10 @@ aln_df = [
 aln_df = [v for v in aln_df if v is not None]
 
 # Make a DataFrame
-aln_df = pd.concat(aln_df)
+if len(aln_df) > 0:
+    aln_df = pd.concat(aln_df)
+else:
+    aln_df = None
 
 
 ###################
@@ -1002,54 +1005,60 @@ def process_genome(genome_id, genome_aln_df):
         ("mean_est_coef", genome_aln_df_fdr["estimate"].mean())
     ])
 
-# Iterate over every genome and process it
-summary_df = [
-    process_genome(genome_id, genome_df)
-    for genome_id, genome_df in aln_df.groupby("genome_id")
-]
+# Make sure that we have any alignments to summarize
+if aln_df is not None:
 
-summary_df = [v for v in summary_df if v is not None]
+    # Iterate over every genome and process it
+    summary_df = [
+        process_genome(genome_id, genome_df)
+        for genome_id, genome_df in aln_df.groupby("genome_id")
+    ]
 
-# Check that we have any data to save
-if len(summary_df) > 0:
+    summary_df = [v for v in summary_df if v is not None]
 
-    # Make a DataFrame
-    summary_df = pd.DataFrame(summary_df)
+    # Check that we have any data to save
+    if len(summary_df) > 0:
 
-    # Save to the HDF
-    summary_df.to_hdf(
-        output_store,
-        "/genomes/summary/%s" % parameter_name,
-        format = "fixed"
-    )
+        # Make a DataFrame
+        summary_df = pd.DataFrame(summary_df)
+
+        # Save to the HDF
+        summary_df.to_hdf(
+            output_store,
+            "/genomes/summary/%s" % parameter_name,
+            format = "fixed"
+        )
 
 
 ########################
 # WRITE OUT GENOME MAP #
 ########################
 
-# Compute a rolling window for the Wald metric across the genome
-for genome_id, genome_df in aln_df.groupby("genome_id"):
+# Make sure that we have any alignments to summarize
+if aln_df is not None:
 
-    # Format the rolling window across every contig
-    pd.concat([
-        contig_df.sort_values(
-            by="contig_start"
-        ).reindex(
-            columns=["contig_start", "wald", "estimate", "p_value"]
-        ).rolling(
-            ${params.window_size},
-        ).median(
-        ).dropna(
-        ).assign(
-            contig=contig_id,
-            genome=genome_id,
+    # Compute a rolling window for the Wald metric across the genome
+    for genome_id, genome_df in aln_df.groupby("genome_id"):
+
+        # Format the rolling window across every contig
+        pd.concat([
+            contig_df.sort_values(
+                by="contig_start"
+            ).reindex(
+                columns=["contig_start", "wald", "estimate", "p_value"]
+            ).rolling(
+                ${params.window_size},
+            ).median(
+            ).dropna(
+            ).assign(
+                contig=contig_id,
+                genome=genome_id,
+            )
+            for contig_id, contig_df in genome_df.groupby("contig")
+        ]).to_hdf(
+            output_store,
+            "/genomes/map/%s/%s" % (parameter_name, genome_id)
         )
-        for contig_id, contig_df in genome_df.groupby("contig")
-    ]).to_hdf(
-        output_store,
-        "/genomes/map/%s/%s" % (parameter_name, genome_id)
-    )
 
 
 ######################
