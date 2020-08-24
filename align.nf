@@ -806,8 +806,7 @@ gene_assoc_df = pd.read_csv(
 ######################
 
 # Make a single dictionary with the number of genes in each CAG
-cag_size = gene_assoc_df["CAG"].value_counts()
-
+cag_size = gene_assoc_df["CAG"].apply(int).value_counts()
 
 ########################
 # PARSE PARAMETER NAME #
@@ -894,7 +893,11 @@ def filter_alignments(genome_aln_df):
 
     # Filter genes based on CAG size
     genome_aln_df = genome_aln_df.assign(
-        CAG_size = genome_aln_df["CAG"].apply(cag_size.get)
+        CAG_size = genome_aln_df["CAG"].apply(
+            int
+        ).apply(
+            cag_size.get
+        )
     ).query(
         "CAG_size >= %d" % min_cag_size
     ).drop(
