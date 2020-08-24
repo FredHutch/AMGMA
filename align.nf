@@ -468,10 +468,24 @@ print("Read in %d gene alignments for %d genomes" % (aln_df.shape[0], aln_df["ge
 
 print("Adding CAG labels")
 aln_df = aln_df.assign(
-    CAG = aln_df["gene"].apply(
-        gene_cag_map["CAG"].get
-    )
+    CAG = aln_df["gene"].apply(gene_cag_map["CAG"].get)
 )
+
+# Remove any genes which don't have a CAG label
+print("%d / %d genes have a valid CAG label" % (aln_df["CAG"].dropna().shape[0], aln_df.shape[0]))
+assert aln_df["CAG"].isnull().sum() < aln_df.shape[0]
+aln_df = aln_df.assign(
+    has_CAG = aln_df["CAG"].apply(lambda cag_id: pd.isnull(cag_id) is False)
+).query(
+    "has_CAG"
+).drop(
+    columns="has_CAG"
+)
+
+# Format the CAG as an integer
+aln_df["CAG"] = aln_df["CAG"].apply(int)
+
+print("Read in %d gene alignments for %d genomes" % (aln_df.shape[0], aln_df["genome_id"].unique().shape[0]))
 
 # Function to calculate containment scores
 def calc_containment(df, cag_id, n_genes_in_cag):
