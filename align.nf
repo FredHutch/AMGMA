@@ -1097,6 +1097,7 @@ output_store.close()
             file "association_shard.*.hdf5" from association_shard_hdf_list
             file geneshot_hdf
             file manifest_csv from valid_manifest_ch
+            file "genome_alignments.*.hdf5" from genome_alignment_shards.toSortedList()
         
         output:
             file "${params.output_hdf}" into final_hdf
@@ -1216,6 +1217,25 @@ for parameter_name, genome_summary_list in parameter_summaries.items():
         format = "fixed",
         complevel = 5
     )
+
+# Write out the genome maps, if there are any
+for fp in os.listdir("."):
+
+    # Parse any files with matching filenames
+    if fp.startswith("genome_alignments.") and fp.endswith(".hdf5"):
+
+        # Open up the file
+        with pd.HDFStore(fp, "r") as input_store:
+
+            # Iterate over every table
+            for k in input_store:
+
+                # Read in the table
+                df = pd.read_hdf(input_store, k)
+
+                # Write to the output HDF
+                print("Writing alignment details for %s" % k)
+                df.to_hdf(output_store, k)
 
 output_store.close()
 
