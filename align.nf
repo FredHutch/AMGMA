@@ -293,7 +293,7 @@ if (params.blast) {
             tuple file(aln_tsv_gz), file(header_csv_gz) from raw_alignment_ch
 
         output:
-            tuple file("${aln_tsv_gz}.filtered.tsv.gz"), file("${header_csv_gz}") into alignments_ch_1, alignments_ch_2
+            tuple file("${aln_tsv_gz}.filtered.tsv.gz"), file("${header_csv_gz}") into alignments_ch
 
 """#!/usr/bin/env python3
 
@@ -339,7 +339,7 @@ df.to_csv("${aln_tsv_gz}.filtered.tsv.gz", sep="\\t", index=None, header=None)
             file geneshot_dmnd
 
         output:
-            tuple file("${database_chunk_tar.name.replaceAll(/.tar/, ".aln.gz")}"), file("${database_chunk_tar.name.replaceAll(/.tar/, ".csv.gz")}") into alignments_ch_1, alignments_ch_2
+            tuple file("${database_chunk_tar.name.replaceAll(/.tar/, ".aln.gz")}"), file("${database_chunk_tar.name.replaceAll(/.tar/, ".csv.gz")}") into alignments_ch
 
     """
     #!/bin/bash
@@ -374,6 +374,39 @@ df.to_csv("${aln_tsv_gz}.filtered.tsv.gz", sep="\\t", index=None, header=None)
 }
 
 
+// Calculate the containment of each CAG in each genome
+process filterAlignments {
+    
+    container "ubuntu:20.04"
+    label 'io_limited'
+    errorStrategy 'retry'
+
+    input:
+        tuple file(aln_tsv_gz), file(header_csv_gz) from alignments_ch
+
+    output:
+        tuple file("${aln_tsv_gz}"), file("${header_csv_gz}") into alignments_ch_1, alignments_ch_2
+
+"""
+#!/bin/bash
+
+set -e
+
+if (( \$( cat ${aln_tsv_gz} | wc -l ) > 0 )); then
+
+    echo "Number of alignments: \$( cat ${aln_tsv_gz} | wc -l )"
+
+else
+
+    echo "No alignments found, filtering out"
+
+    rm ${aln_tsv_gz} ${header_csv_gz}
+
+fi
+
+"""
+
+}
 // Calculate the containment of each CAG in each genome
 process calculateContainment {
     tag "Overlap between CAGs and genomes"
@@ -446,6 +479,8 @@ aln_df = pd.read_csv(
         "contig", "gene", "pident", "length", "contig_start", "contig_end", "contig_len", "gene_start", "gene_end", "gene_len"
     ]
 )
+
+print("Read in %d alignments" % aln_df.shape[0])
 
 # Calculate the number of bases spanned by each alignment
 aln_df = aln_df.assign(
@@ -867,6 +902,8 @@ aln_df = pd.read_csv(
         "contig", "gene", "pident", "length", "contig_start", "contig_end", "contig_len", "gene_start", "gene_end", "gene_len"
     ]
 )
+
+print("Read in %d alignments" % aln_df.shape[0])
 
 # Stop if there are no alignments
 if aln_df.shape[0]:
