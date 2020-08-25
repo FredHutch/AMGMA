@@ -385,7 +385,7 @@ process filterAlignments {
         tuple file(aln_tsv_gz), file(header_csv_gz) from alignments_ch
 
     output:
-        tuple file("${aln_tsv_gz}"), file("${header_csv_gz}") into alignments_ch_1, alignments_ch_2
+        tuple file("${aln_tsv_gz}"), file("${header_csv_gz}") optional true into alignments_ch_1, alignments_ch_2
 
 """
 #!/bin/bash
