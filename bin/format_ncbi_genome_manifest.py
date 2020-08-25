@@ -95,10 +95,15 @@ format_ncbi_genome_manifest.py \
         )
 
     # Read in the input files
-    df = pd.concat([
-        pd.read_csv(fp)
-        for fp in args.input_csv
-    ], sort=True)
+    df = pd.concat(
+        [
+            pd.read_csv(fp)
+            for fp in args.input_csv
+        ], 
+        sort=True
+    ).reset_index(
+        drop=True
+    )
 
     # Only keep genomes which have valid GenBank paths
     df = df.reindex(
