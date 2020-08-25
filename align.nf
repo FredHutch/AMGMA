@@ -795,7 +795,7 @@ print("All done!")
             each file(gene_association_csv) from gene_association_csv_ch.flatten()
         
         output:
-            file "genome_association_shard.*.hdf5" into association_shard_hdf
+            file "genome_association_shard.*.hdf5" optional true into association_shard_hdf
         
     """#!/usr/bin/env python3
 
@@ -867,6 +867,10 @@ aln_df = pd.read_csv(
         "contig", "gene", "pident", "length", "contig_start", "contig_end", "contig_len", "gene_start", "gene_end", "gene_len"
     ]
 )
+
+# Stop if there are no alignments
+if aln_df.shape[0]:
+    exit()
 
 print("Adding genome labels")
 aln_df = aln_df.assign(
