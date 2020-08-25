@@ -136,7 +136,7 @@ assert all_unique, "Must provide entirely unique genome IDs"
 // Fetch genomes via FTP
 process fetchFTP {
     tag "Download genomes hosted by FTP"
-    container 'quay.io/fhcrc-microbiome/wget@sha256:98b90e8bb8a171182505f1e255b0bd85cbbda68f08c08b4877c3fc48e63ac82f'
+    container 'quay.io/fhcrc-microbiome/wget:latest'
     label 'io_limited'
     errorStrategy "retry"
 
