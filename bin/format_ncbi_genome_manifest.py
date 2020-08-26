@@ -15,6 +15,12 @@ def format_genbank_record(r, mask_characters=[",", ";", "/", "\\"]):
         r["GenBank FTP"].rsplit("/", 1)[1]
     )
 
+    # Also format the path to the genome annotations in GFF format
+    gff = "{}/{}_genomic.gff.gz".format(
+        r["GenBank FTP"],
+        r["GenBank FTP"].rsplit("/", 1)[1]
+    )
+
     # Use the assembly ID as the id
     uuid = r["Assembly"]
 
@@ -32,7 +38,8 @@ def format_genbank_record(r, mask_characters=[",", ";", "/", "\\"]):
     return pd.Series({
         "name": name,
         "id": uuid,
-        "uri": uri
+        "uri": uri,
+        "gff": gff,
     })
 
 if __name__ == "__main__":
