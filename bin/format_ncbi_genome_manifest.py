@@ -11,14 +11,14 @@ def format_genbank_record(r, mask_characters=[",", ";", "/", "\\"]):
 
     # Format the full path to the genome from the FTP prefix
     uri = "{}/{}_genomic.fna.gz".format(
-        r["GenBank FTP"],
-        r["GenBank FTP"].rsplit("/", 1)[1]
+        r["RefSeq FTP"],
+        r["RefSeq FTP"].rsplit("/", 1)[1]
     )
 
     # Also format the path to the genome annotations in GFF format
     gff = "{}/{}_genomic.gff.gz".format(
-        r["GenBank FTP"],
-        r["GenBank FTP"].rsplit("/", 1)[1]
+        r["RefSeq FTP"],
+        r["RefSeq FTP"].rsplit("/", 1)[1]
     )
 
     # Use the assembly ID as the id
