@@ -84,3 +84,27 @@ tar cvfh \$(mktemp ${params.tar_prefix}.XXXXXXXXX).tar ${file_list}
 
 """
 }
+
+// Repack an HDF5 file
+process repackHDF {
+
+    container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+    label "mem_medium"
+    errorStrategy "retry"
+    
+    input:
+    file output_hdf5
+        
+    output:
+    file "${output_hdf5}"
+
+    """
+#!/bin/bash
+
+set -e
+
+[ -s ${output_hdf5} ]
+
+h5repack -f GZIP=5 ${output_hdf5} TEMP && mv TEMP ${output_hdf5}
+    """
+}

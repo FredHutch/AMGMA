@@ -31,6 +31,7 @@ include combineRemoteFiles as combineRemoteFiles_fasta from './modules/modules' 
 include combineRemoteFiles as combineRemoteFiles_gff from './modules/modules' params(
     tar_prefix: "genomes_gff"
 )
+include repackHDF from './modules/modules'
 
 // Function which prints help message text
 def helpMessage() {
@@ -151,11 +152,16 @@ workflow {
         gff_ch.toSortedList()
     )
 
+    // Repack and compress the annotations
+    repackHDF(
+        formatAnnotations.out
+    )
+
     // Make a single tarball
     makeDatabase(
         combineGenomes.out.toSortedList(),
         validateManifest.out,
-        formatAnnotations.out
+        repackHDF.out
     )
 
 }
