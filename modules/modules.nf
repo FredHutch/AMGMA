@@ -28,7 +28,7 @@ for uri_id in ${uri_id_list.join(" ")}; do
     # Make sure the file is gzip compressed
     if [[ `gzip -t \$id${params.file_suffix}` ]]; then
 
-        echo "\$id${params.file_suffix} is downloaded in proper gzip format"
+        echo "\$id is downloaded in proper gzip format"
 
     else
 
