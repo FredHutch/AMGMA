@@ -133,6 +133,7 @@ process unpackDatabase {
     output:
         file "${db}.manifest.csv" into manifest_ch
         file "*tar" into database_tar_list
+        file "genome_annotations.hdf5" into genome_annotations_hdf5
 
 """
 #!/bin/bash 
@@ -144,6 +145,11 @@ ls -lahtr
 tar xvf ${db}
 
 mv database_manifest.csv ${db}.manifest.csv
+
+# Make a dummy file for the genome annotations
+if [[ ! -s genome_annotations.hdf5 ]]; then
+    touch genome_annotations.hdf5
+fi
 
 echo "Done"
 
@@ -1140,6 +1146,7 @@ output_store.close()
             file geneshot_hdf
             file manifest_csv from valid_manifest_ch
             file "genome_alignments.*.hdf5" from genome_alignment_shards.toSortedList()
+            file "genome_annotations.hdf5" from genome_annotations_hdf5
         
         output:
             file "${params.output_hdf}" into final_hdf
@@ -1282,6 +1289,26 @@ for fp in os.listdir("."):
                 print("Writing alignment details for %s" % k)
                 df.to_hdf(output_store, k)
 
+# Write out the genome annotations, if there are any
+try:
+
+    annotation_store = pd.HDFStore("genome_annotations.hdf5", "r")
+
+    # Write the annotations directly into the results
+    for k in annotation_store:
+        print("Copying %s to output" % k)
+        pd.read_hdf(
+            annotation_store,
+            k
+        ).to_hdf(
+            output_store,
+            "/genomes%s" % k
+        )
+
+except:
+
+    print("No annotations found")
+
 output_store.close()
 
     """
@@ -1299,6 +1326,7 @@ output_store.close()
             file geneshot_hdf
             file manifest_csv from valid_manifest_ch
             file "genome_alignments.*.hdf5" from genome_alignment_shards.toSortedList()
+            file "genome_annotations.hdf5" from genome_annotations_hdf5
         
         output:
             file "${params.output_hdf}" into final_hdf
@@ -1371,6 +1399,26 @@ for fp in os.listdir("."):
                 # Write to the output HDF
                 print("Writing alignment details for %s" % k)
                 df.to_hdf(output_store, k)
+
+# Write out the genome annotations, if there are any
+try:
+
+    annotation_store = pd.HDFStore("genome_annotations.hdf5", "r")
+
+    # Write the annotations directly into the results
+    for k in annotation_store:
+        print("Copying %s to output" % k)
+        pd.read_hdf(
+            annotation_store,
+            k
+        ).to_hdf(
+            output_store,
+            "/genomes%s" % k
+        )
+
+except:
+
+    print("No annotations found")
 
 output_store.close()
 
