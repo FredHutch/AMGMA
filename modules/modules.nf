@@ -21,10 +21,32 @@ for uri_id in ${uri_id_list.join(" ")}; do
 
     echo "Downloading \$id from \$uri"
 
-    wget --quiet -O \$id${params.file_suffix} \$uri
+    # Try to download, and also save the log
+    # If the system call returns non-zero, make sure to escape it
+    wget -o \$id.log -O \$id${params.file_suffix} \$uri || echo "Encountered problem downloading"
 
     # Make sure the file is gzip compressed
-    (gzip -t \$id${params.file_suffix} && echo "\$id${params.file_suffix} is in gzip format") || ( echo "\$id${params.file_suffix} is NOT in gzip format" && exit 1 )
+    if [[ `gzip -t \$id${params.file_suffix}` ]]; then
+
+        echo "\$id${params.file_suffix} is downloaded in proper gzip format"
+
+    else
+
+        # Now it seems that the file was not downloaded in proper gzip format
+
+        # First check to see if the file even exists on the server by looking at the log file
+        if (( cat \$id.log | grep -c "No such file" )); then
+
+            echo "File does not exist on server, skipping \$uri"
+
+        else
+
+            echo "File does exist on server, but was not downloaded correctly (\$uri)"
+            exit 1
+
+        fi
+
+    fi
 
 done
 
