@@ -10,6 +10,27 @@ params.output_folder = false
 params.output_prefix = false
 params.batchsize = 100
 
+// Import modules
+include fetchFTP as fetchFTP_fasta from './modules/modules' params(
+    file_suffix: ".fasta.gz",
+    tar_prefix: "genomes_fasta"
+)
+include fetchFTP as fetchFTP_gff from './modules/modules' params(
+    file_suffix: ".gff.gz",
+    tar_prefix: "genomes_gff"
+)
+include renameRemoteFiles as renameRemoteFiles_fasta from './modules/modules' params(
+    file_suffix: ".fasta.gz"
+)
+include renameRemoteFiles as renameRemoteFiles_gff from './modules/modules' params(
+    file_suffix: ".gff.gz"
+)
+include combineRemoteFiles as combineRemoteFiles_fasta from './modules/modules' params(
+    tar_prefix: "genomes_fasta"
+)
+include combineRemoteFiles as combineRemoteFiles_gff from './modules/modules' params(
+    tar_prefix: "genomes_gff"
+)
 
 // Function which prints help message text
 def helpMessage() {
@@ -45,7 +66,12 @@ workflow {
         exit 0
     }
 
-    // Parse the manifest
+    // Validate the manifest
+    validateManifest(
+        file(params.manifest)
+    )
+
+    // Parse the manifest for the URI to the genome FASTA
     Channel.from(
         file(params.manifest)
     ).splitCsv(
@@ -60,28 +86,23 @@ workflow {
     }
 
     // Fetch files from FTP
-    fetchFTP(
+    fetchFTP_fasta(
         split_genome_ch.ftp.map{r -> "${r[1]}:::${r[0]}"}.toSortedList().flatten().collate(params.batchsize)
     )
 
     // Make sure the other remote files are named correctly
-    renameRemoteFiles(
+    renameRemoteFiles_fasta(
         split_genome_ch.other.map{r -> [r[0], file(r[1])]}
     )
 
     // Combine the remote files
-    combineRemoteFiles(
-        renameRemoteFiles.out.toSortedList().flatten().collate(params.batchsize)
-    )
-
-    // Validate the manifest
-    validateManifest(
-        file(params.manifest)
+    combineRemoteFiles_fasta(
+        renameRemoteFiles_fasta.out.toSortedList().flatten().collate(params.batchsize)
     )
 
     // Now join the channels together
-    genome_ch = combineRemoteFiles.out.mix(
-        fetchFTP.out
+    genome_ch = combineRemoteFiles_fasta.out.mix(
+        fetchFTP_fasta.out
     )
 
     // Reformat each batch of genomes
@@ -89,10 +110,52 @@ workflow {
         genome_ch
     )
 
+    // Parse the manifest for the URI to the genome annotations in GFF format
+    Channel.from(
+        file(params.manifest)
+    ).splitCsv(
+        header: true
+    ).filter(
+        { it.gff != null }
+    ).map {
+        r -> [r["id"], r["gff"]]
+    }.branch {
+        ftp: it[1].startsWith("ftp://")
+        other: !it[1].startsWith("ftp://")
+    }.set {
+        split_gff_ch
+    }
+
+    // Fetch files from FTP
+    fetchFTP_gff(
+        split_gff_ch.ftp.map{r -> "${r[1]}:::${r[0]}"}.toSortedList().flatten().collate(params.batchsize)
+    )
+
+    // Make sure the other remote files are named correctly
+    renameRemoteFiles_gff(
+        split_gff_ch.other.map{r -> [r[0], file(r[1])]}
+    )
+
+    // Combine the remote files
+    combineRemoteFiles_gff(
+        renameRemoteFiles_gff.out.toSortedList().flatten().collate(params.batchsize)
+    )
+
+    // Now join the channels together
+    gff_ch = combineRemoteFiles_gff.out.mix(
+        fetchFTP_gff.out
+    )
+
+    // Format all of the annotations as a single HDF5
+    formatAnnotations(
+        gff_ch.toSortedList()
+    )
+
     // Make a single tarball
     makeDatabase(
         combineGenomes.out.toSortedList(),
-        validateManifest.out
+        validateManifest.out,
+        formatAnnotations.out
     )
 
 }
@@ -132,95 +195,6 @@ assert all_unique, "Must provide entirely unique genome IDs"
 """
 }
 
-
-// Fetch genomes via FTP
-process fetchFTP {
-    tag "Download genomes hosted by FTP"
-    container 'quay.io/fhcrc-microbiome/wget:latest'
-    label 'io_limited'
-    errorStrategy "retry"
-
-    input:
-        val uri_id_list
-    
-    output:
-        file "genomes_fasta.*.tar"
-    
-"""
-#!/bin/bash
-set -e
-
-for uri_id in ${uri_id_list.join(" ")}; do
-
-    uri=\$(echo \$uri_id | sed 's/:::.*//')
-    id=\$(echo \$uri_id | sed 's/.*::://')
-
-    echo "Downloading \$id from \$uri"
-
-    wget --quiet -O \$id.fasta.gz \$uri
-
-    # Make sure the file is gzip compressed
-    (gzip -t \$id.fasta.gz && echo "\$id.fasta.gz is in gzip format") || ( echo "\$id.fasta.gz is NOT in gzip format" && exit 1 )
-
-done
-
-echo "Making a tar with all genomes in this batch"
-tar cfh \$(mktemp genomes_fasta.XXXXXXXXX).tar *.fasta.gz
-
-echo "done"
-
-"""
-}
-
-
-// Rename the files from S3 to explicitly match the provided ID
-process renameRemoteFiles {
-    container 'ubuntu:20.04'
-    label 'io_limited'
-    errorStrategy 'retry'
-
-    input:
-        tuple val(id), file(genome_fasta)
-
-    output:
-        file "${id}.fasta.gz"
-
-"""
-#!/bin/bash
-
-set -e
-
-ls -lahtr
-
-mv ${genome_fasta} TEMP && mv TEMP ${id}.fasta.gz
-
-(gzip -t ${id}.fasta.gz && echo "${genome_fasta} is in gzip format") || ( echo "${genome_fasta} is NOT in gzip format" && exit 1 )
-
-"""
-}
-
-
-// Combine remote files into tar files with ${batchsize} genomes each
-process combineRemoteFiles {
-    container 'ubuntu:20.04'
-    label 'io_limited'
-    errorStrategy 'retry'
-
-    input:
-        file fasta_list
-
-    output:
-        file "genomes_fasta.*.tar"
-
-"""
-#!/bin/bash
-
-set -e
-
-tar cvfh \$(mktemp genomes_fasta.XXXXXXXXX).tar ${fasta_list}
-
-"""
-}
 
 // Take a set of genomes and make a single tar file which contains
 // a combined_genomes.fasta.gz file with the concatenated set of genomes
@@ -310,6 +284,7 @@ process makeDatabase {
     input:
         file tar_list
         file "database_manifest.csv"
+        file genome_annotations_hdf
 
     output:
         file "${params.output_prefix}.tar"
@@ -320,7 +295,86 @@ process makeDatabase {
 set -e
 
 # Make a tarball with all of the inputs
-tar cvfh ${params.output_prefix}.tar ${tar_list} database_manifest.csv
+tar cvfh ${params.output_prefix}.tar ${tar_list} ${genome_annotations_hdf} database_manifest.csv
+
+"""
+}
+
+// Read in all of the GFF files and format the annotations consistently
+process formatAnnotations {
+    container "quay.io/fhcrc-microbiome/python-pandas:v1.0.3"
+    label 'mem_medium'
+    errorStrategy 'retry'
+
+    input:
+    file gff_tar_list
+
+    output:
+    file "genome_annotations.hdf5"
+
+"""
+#!/usr/bin/env python3
+
+import os
+import pandas as pd
+import tarfile
+
+def parse_gff(fp):
+    # Function to parse a GFF file
+    return pd.read_csv(
+        fp, 
+        sep="\\t", 
+        comment="#",
+        compression="gzip",
+        names = [
+            "contig",
+            "source",
+            "type",
+            "start",
+            "end",
+            "score",
+            "orientation",
+            "_",
+            "annotation",
+        ]
+    ).assign(
+        to_keep = lambda df: df["type"].isin(["CDS", "gene", "mRNA"])
+    ).query(
+        "to_keep"
+    ).reindex(
+        columns=[
+            "contig",
+            "type",
+            "start",
+            "end",
+            "orientation",
+            "annotation"
+        ]
+    ).reset_index(
+        drop=True
+    )
+
+with pd.HDFStore("genome_annotations.hdf5", "w") as store:
+
+    for fp in os.listdir("."):
+        if fp.startswith("genomes_gff") is False:
+            continue
+        if fp.endswith("tar") is False:
+            continue
+
+        # implicit else
+        with tarfile.open(fp, "r:*") as tar:
+            for gff_path in tar.getnames():
+                df = parse_gff(
+                    tar.extractfile(gff_path)
+                )
+                id_string = gff_path.replace(".gff.gz", "")
+
+                # Write to the HDF5
+                df.to_hdf(
+                    store,
+                    "/annotations/%s" % id_string
+                )
 
 """
 }

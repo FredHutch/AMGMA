@@ -49,6 +49,21 @@ jobs:
           cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run build_db.nf -with-docker ubuntu:18.04 -w work/ --manifest data/genome.manifest.csv --output_folder db --output_prefix amgma -profile testing --batchsize 2 
         working-directory: /tmp/
 
+  buildDB_annotations:
+    runs-on: ubuntu-latest
+    env:
+      NXF_ANSI_LOG: 0
+    steps:
+      - uses: actions/checkout@v1
+      - name: Install Nextflow
+        run: |
+          wget -qO- get.nextflow.io | bash
+          sudo mv nextflow /usr/local/bin/
+      - name:  Build Database with Annotations
+        run: |
+          cd $GITHUB_WORKSPACE && NXF_VER=20.01.0 nextflow run build_db.nf -with-docker ubuntu:18.04 -w work/ --manifest data/genome.manifest.gff.csv --output_folder db_annot --output_prefix amgma -profile testing --batchsize 2 
+        working-directory: /tmp/
+
   workflow:
     runs-on: ubuntu-latest
     env:
