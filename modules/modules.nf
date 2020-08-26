@@ -12,6 +12,7 @@ process fetchFTP {
     
 """
 #!/bin/bash
+
 set -e
 
 for uri_id in ${uri_id_list.join(" ")}; do
@@ -26,25 +27,19 @@ for uri_id in ${uri_id_list.join(" ")}; do
     wget -o \$id.log -O \$id${params.file_suffix} \$uri || echo "Encountered problem downloading"
 
     # Make sure the file is gzip compressed
-    if [[ `gzip -t \$id${params.file_suffix}` ]]; then
+    gzip -t \$id${params.file_suffix} && echo "\$id is downloaded in proper gzip format" && continue
 
-        echo "\$id is downloaded in proper gzip format"
+    # Now it seems that the file was not downloaded in proper gzip format
+
+    # First check to see if the file even exists on the server by looking at the log file
+    if (( \$(cat \$id.log | grep -c "No such file") == 1 )); then
+
+        echo "File does not exist on server, skipping \$uri"
 
     else
 
-        # Now it seems that the file was not downloaded in proper gzip format
-
-        # First check to see if the file even exists on the server by looking at the log file
-        if (( $(cat \$id.log | grep -c "No such file") == 1 )); then
-
-            echo "File does not exist on server, skipping \$uri"
-
-        else
-
-            echo "File does exist on server, but was not downloaded correctly (\$uri)"
-            exit 1
-
-        fi
+        echo "File does exist on server, but was not downloaded correctly (\$uri)"
+        exit 1
 
     fi
 
@@ -54,7 +49,6 @@ echo "Making a tar with all genomes in this batch"
 tar cfh \$(mktemp ${params.tar_prefix}.XXXXXXXXX).tar *${params.file_suffix}
 
 echo "done"
-
 """
 }
 
