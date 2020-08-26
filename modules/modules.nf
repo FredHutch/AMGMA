@@ -35,7 +35,7 @@ for uri_id in ${uri_id_list.join(" ")}; do
         # Now it seems that the file was not downloaded in proper gzip format
 
         # First check to see if the file even exists on the server by looking at the log file
-        if (( cat \$id.log | grep -c "No such file" )); then
+        if (( $(cat \$id.log | grep -c "No such file") == 1 )); then
 
             echo "File does not exist on server, skipping \$uri"
 
