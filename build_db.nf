@@ -11,27 +11,27 @@ params.output_prefix = false
 params.batchsize = 100
 
 // Import modules
-include fetchFTP as fetchFTP_fasta from './modules/modules' params(
+include {fetchFTP as fetchFTP_fasta} from './modules/modules' params(
     file_suffix: ".fasta.gz",
     tar_prefix: "genomes_fasta"
 )
-include fetchFTP as fetchFTP_gff from './modules/modules' params(
+include {fetchFTP as fetchFTP_gff} from './modules/modules' params(
     file_suffix: ".gff.gz",
     tar_prefix: "genomes_gff"
 )
-include renameRemoteFiles as renameRemoteFiles_fasta from './modules/modules' params(
+include {renameRemoteFiles as renameRemoteFiles_fasta} from './modules/modules' params(
     file_suffix: ".fasta.gz"
 )
-include renameRemoteFiles as renameRemoteFiles_gff from './modules/modules' params(
+include {renameRemoteFiles as renameRemoteFiles_gff} from './modules/modules' params(
     file_suffix: ".gff.gz"
 )
-include combineRemoteFiles as combineRemoteFiles_fasta from './modules/modules' params(
+include {combineRemoteFiles as combineRemoteFiles_fasta} from './modules/modules' params(
     tar_prefix: "genomes_fasta"
 )
-include combineRemoteFiles as combineRemoteFiles_gff from './modules/modules' params(
+include {combineRemoteFiles as combineRemoteFiles_gff} from './modules/modules' params(
     tar_prefix: "genomes_gff"
 )
-include repackHDF from './modules/modules'
+include {repackHDF} from './modules/modules'
 
 // Function which prints help message text
 def helpMessage() {
