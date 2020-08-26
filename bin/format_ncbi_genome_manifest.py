@@ -9,16 +9,22 @@ import pandas as pd
 def format_genbank_record(r, mask_characters=[",", ";", "/", "\\"]):
     """Function to reformat the information from NCBI in AMGMA manifest format."""
 
+    # Use the RefSeq entry if it is available
+    if isinstance(r["RefSeq FTP"], str):
+        url_base = r["RefSeq FTP"]
+    else:
+        url_base = r["GenBank FTP"]
+
     # Format the full path to the genome from the FTP prefix
     uri = "{}/{}_genomic.fna.gz".format(
-        r["RefSeq FTP"],
-        r["RefSeq FTP"].rsplit("/", 1)[1]
+        url_base,
+        url_base.rsplit("/", 1)[1]
     )
 
     # Also format the path to the genome annotations in GFF format
     gff = "{}/{}_genomic.gff.gz".format(
-        r["RefSeq FTP"],
-        r["RefSeq FTP"].rsplit("/", 1)[1]
+        url_base,
+        url_base.rsplit("/", 1)[1]
     )
 
     # Use the assembly ID as the id
