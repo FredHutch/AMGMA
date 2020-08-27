@@ -147,14 +147,19 @@ workflow {
         fetchFTP_gff.out
     )
 
-    // Format all of the annotations as a single HDF5
+    // Format all of the annotations as HDF5
     formatAnnotations(
-        gff_ch.toSortedList()
+        gff_ch
+    )
+
+    // Join all of the annotations into a single HDF5
+    joinAnnotations(
+        formatAnnotations.out.toSortedList()
     )
 
     // Repack and compress the annotations
     repackHDF(
-        formatAnnotations.out
+        joinAnnotations.out
     )
 
     // Make a single tarball
@@ -381,6 +386,65 @@ with pd.HDFStore("genome_annotations.hdf5", "w") as store:
                     store,
                     "/annotations/%s" % id_string
                 )
+
+"""
+}
+
+// Join a set of multiple annotations
+process joinAnnotations {
+    container "quay.io/fhcrc-microbiome/python-pandas:latest"
+    label 'mem_medium'
+    errorStrategy 'retry'
+
+    input:
+    file "genome_annotations.*.hdf5"
+
+    output:
+    file "genome_annotations.hdf5"
+
+"""
+#!/usr/bin/env python3
+
+import os
+import h5py
+
+# Get the list of input files
+input_fp_list = [
+    fp for fp in os.listdir(".")
+    if fp.startswith("genome_annotations.") and fp.endswith(".hdf5")
+]
+print("Preparing to combine %d input files" % len(input_fp_list))
+
+# Open a connection to the output file
+output_store = h5py.File("genome_annotations.hdf5", "w")
+
+# Function to copy objects to the output file
+def copy_objects(fp):
+    # Try to open the file
+    try:
+        f = h5py.File(fp, "r")
+    except:
+        print("Could not open %s" % fp)
+        return
+
+    # Make a group for the destination, if necessary
+    if "annotations" not in output_store.keys():
+        output_store.create_group("/annotations")
+
+    # If successful, copy everything over from /annotations
+    for k in f["annotations"]:
+        print(k)
+        f.copy("annotations/%s" % k, output_store["/annotations/"])
+
+    f.close()
+    print("Done processing %s" % fp)
+
+# Copy the data
+for fp in input_fp_list:
+    copy_objects(fp)
+
+# Close the output file
+output_store.close()
 
 """
 }
