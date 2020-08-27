@@ -1316,11 +1316,13 @@ if annotation_store is not False:
     # Append the annotations directly into the results
     output_store = h5py.File("${params.output_hdf}", "a")
 
-    # Copy the entire group of annotations
-    annotation_store.copy(
-        "/annotations/",
-        output_store["/genomes/"]
-    )
+    if "annotations" in output_store:
+
+        # Copy the entire group of annotations
+        annotation_store.copy(
+            "/annotations/",
+            output_store["/genomes/"]
+        )
 
     output_store.close()
     annotation_store.close()
@@ -1432,11 +1434,13 @@ if annotation_store is not False:
     # Append the annotations directly into the results
     output_store = h5py.File("${params.output_hdf}", "a")
 
-    # Copy the entire group of annotations
-    annotation_store.copy(
-        "/annotations/",
-        output_store["/genomes/"]
-    )
+    if "annotations" in output_store:
+
+        # Copy the entire group of annotations
+        annotation_store.copy(
+            "/annotations/",
+            output_store["/genomes/"]
+        )
 
     output_store.close()
     annotation_store.close()
