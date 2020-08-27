@@ -20,7 +20,7 @@ params.min_cag_prop = 0.25
 params.window_size = 5
 
 // Commonly used containers
-container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3_py38_ubuntu"
+container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3_py38_h5py"
 container_diamond = "quay.io/fhcrc-microbiome/docker-diamond:v0.9.31--3"
 container__blast = "ncbi/blast:2.10.1"
 
@@ -433,6 +433,9 @@ process calculateContainment {
 
 import pandas as pd
 import os
+import pickle
+
+pickle.HIGHEST_PROTOCOL = 4
 
 # In this task we will calculate the containment for each genome against each CAG
 
@@ -702,7 +705,10 @@ if (params.no_associations == false){
     """#!/usr/bin/env python3
 
 import pandas as pd
+import pickle
 from statsmodels.stats.multitest import multipletests
+
+pickle.HIGHEST_PROTOCOL = 4
 
 store_fp = "${geneshot_hdf}"
 print("Reading data from %s" % store_fp)
@@ -842,6 +848,9 @@ print("All done!")
 
 import gzip
 import pandas as pd
+import pickle
+
+pickle.HIGHEST_PROTOCOL = 4
 
 ##########################
 # READ GENE ASSOCIATIONS #
@@ -1153,6 +1162,7 @@ output_store.close()
         
     """#!/usr/bin/env python3
 
+import h5py
 import pandas as pd
 import pickle
 import os
@@ -1289,27 +1299,31 @@ for fp in os.listdir("."):
                 print("Writing alignment details for %s" % k)
                 df.to_hdf(output_store, k)
 
+output_store.close()
+
 # Write out the genome annotations, if there are any
 try:
 
-    annotation_store = pd.HDFStore("genome_annotations.hdf5", "r")
-
-    # Write the annotations directly into the results
-    for k in annotation_store:
-        print("Copying %s to output" % k)
-        pd.read_hdf(
-            annotation_store,
-            k
-        ).to_hdf(
-            output_store,
-            "/genomes%s" % k
-        )
+    annotation_store = h5py.File("genome_annotations.hdf5", "r")
 
 except:
 
     print("No annotations found")
+    annotation_store = False
 
-output_store.close()
+if annotation_store is not False:
+
+    # Append the annotations directly into the results
+    output_store = h5py.File("${params.output_hdf}", "a")
+
+    # Copy the entire group of annotations
+    annotation_store.copy(
+        "/annotations/",
+        output_store["/genomes/"]
+    )
+
+    output_store.close()
+    annotation_store.close()
 
     """
     }
@@ -1333,6 +1347,7 @@ output_store.close()
         
     """#!/usr/bin/env python3
 
+import h5py
 import pandas as pd
 import pickle
 import os
@@ -1400,27 +1415,31 @@ for fp in os.listdir("."):
                 print("Writing alignment details for %s" % k)
                 df.to_hdf(output_store, k)
 
+output_store.close()
+
 # Write out the genome annotations, if there are any
 try:
 
-    annotation_store = pd.HDFStore("genome_annotations.hdf5", "r")
-
-    # Write the annotations directly into the results
-    for k in annotation_store:
-        print("Copying %s to output" % k)
-        pd.read_hdf(
-            annotation_store,
-            k
-        ).to_hdf(
-            output_store,
-            "/genomes%s" % k
-        )
+    annotation_store = h5py.File("genome_annotations.hdf5", "r")
 
 except:
 
     print("No annotations found")
+    annotation_store = False
 
-output_store.close()
+if annotation_store is not False:
+
+    # Append the annotations directly into the results
+    output_store = h5py.File("${params.output_hdf}", "a")
+
+    # Copy the entire group of annotations
+    annotation_store.copy(
+        "/annotations/",
+        output_store["/genomes/"]
+    )
+
+    output_store.close()
+    annotation_store.close()
 
     """
     }
