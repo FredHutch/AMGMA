@@ -869,6 +869,7 @@ pickle.HIGHEST_PROTOCOL = 4
 # READ GENE ASSOCIATIONS #
 ##########################
 
+print("Reading in ${gene_association_csv}")
 gene_assoc_df = pd.read_csv(
     "${gene_association_csv}",
     sep = ",",
@@ -935,6 +936,7 @@ print("Read in %d alignments" % aln_df.shape[0])
 
 # Stop if there are no alignments
 if aln_df.shape[0]:
+    print("There are not alignments -- stopping")
     exit()
 
 print("Adding genome labels")
