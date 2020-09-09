@@ -935,7 +935,7 @@ aln_df = pd.read_csv(
 print("Read in %d alignments" % aln_df.shape[0])
 
 # Stop if there are no alignments
-if aln_df.shape[0]:
+if aln_df.shape[0] == 0:
     print("There are not alignments -- stopping")
     exit()
 
