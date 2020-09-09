@@ -675,7 +675,20 @@ else:
             hdf_fp = "genome_containment_shard.${header_csv_gz.name}.hdf5"
             with pd.HDFStore(hdf_fp, "w") as store:
                 for genome_id, genome_df in filtered_alignments.items():
-                    genome_df.to_hdf(
+
+                    # Only save the most essential data
+                    genome_df.reindex(
+                        columns = [
+                            "contig",
+                            "gene",
+                            "pident",
+                            "contig_start",
+                            "contig_end",
+                            "contig_len",
+                            "genome_id",
+                            "CAG",
+                        ]
+                    ).to_hdf(
                         store,
                         "/genomes/detail/%s" % genome_id
                     )
