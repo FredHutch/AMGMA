@@ -1127,7 +1127,7 @@ if aln_df is not None:
     for genome_id, genome_df in aln_df.groupby("genome_id"):
 
         # Format the rolling window across every contig
-        pd.concat([
+        map_df = pd.concat([
             contig_df.sort_values(
                 by="contig_start"
             ).reindex(
@@ -1138,13 +1138,16 @@ if aln_df is not None:
             ).dropna(
             ).assign(
                 contig=contig_id,
-                genome=genome_id,
             )
             for contig_id, contig_df in genome_df.groupby("contig")
-        ]).to_hdf(
-            output_store,
-            "/genomes/map/%s/%s" % (parameter_name, genome_id)
-        )
+        ])
+        
+        # Only write maps that aren't empty
+        if map_df.shape[0] > 0:
+            map_df.to_hdf(
+                output_store,
+                "/genomes/map/%s/%s" % (parameter_name, genome_id)
+            )
 
 
 ######################
