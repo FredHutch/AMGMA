@@ -1320,6 +1320,7 @@ for fp in os.listdir("."):
 output_store.close()
 
 # Write out the genome annotations, if there are any
+print("Attempting to read annotations from genome_annotations.hdf5")
 try:
 
     annotation_store = h5py.File("genome_annotations.hdf5", "r")
@@ -1329,21 +1330,33 @@ except:
     print("No annotations found")
     annotation_store = False
 
-if annotation_store is not False:
+if annotation_store is False:
+
+    print("Unable to open store")
+
+else:
+
 
     # Append the annotations directly into the results
     output_store = h5py.File("${params.output_hdf}", "a")
 
-    if "annotations" in output_store:
+    if "annotations" in annotation_store.keys():
+
+        print("Found %d annotations" % len(annotation_store["annotations"].keys()))
+        print("Copying to ${params.output_hdf}")
 
         # Copy the entire group of annotations
         annotation_store.copy(
             "/annotations/",
             output_store["/genomes/"]
         )
+    else:
+        print("No /annotations/* found in store")
 
     output_store.close()
     annotation_store.close()
+
+    print("Done copying annotations")
 
     """
     }
@@ -1438,6 +1451,7 @@ for fp in os.listdir("."):
 output_store.close()
 
 # Write out the genome annotations, if there are any
+print("Attempting to read annotations from genome_annotations.hdf5")
 try:
 
     annotation_store = h5py.File("genome_annotations.hdf5", "r")
@@ -1447,21 +1461,33 @@ except:
     print("No annotations found")
     annotation_store = False
 
-if annotation_store is not False:
+if annotation_store is False:
+
+    print("Unable to open store")
+
+else:
+
 
     # Append the annotations directly into the results
     output_store = h5py.File("${params.output_hdf}", "a")
 
-    if "annotations" in output_store:
+    if "annotations" in annotation_store.keys():
+
+        print("Found %d annotations" % len(annotation_store["annotations"].keys()))
+        print("Copying to ${params.output_hdf}")
 
         # Copy the entire group of annotations
         annotation_store.copy(
             "/annotations/",
             output_store["/genomes/"]
         )
+    else:
+        print("No /annotations/* found in store")
 
     output_store.close()
     annotation_store.close()
+
+    print("Done copying annotations")
 
     """
     }
