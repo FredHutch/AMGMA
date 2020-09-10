@@ -184,17 +184,17 @@ else:
         print("Found %d annotations" % len(annotation_store["annotations"].keys()))
         print("Filtering down to %d genomes which also have alignments" % len(genomes_to_keep))
         print("Copying to ${params.output_hdf}")
+        print("Creating /genomes/annotations group")
+        output_store.create_group("/genomes/annotations")
 
         # Iterate over every genome available
         for genome_id in annotation_store["/annotations/"].keys():
             if genome_id in genomes_to_keep:
                 print("Copying annotations for %s" % genome_id)
 
-                output_store.create_group("/genomes/annotations/%s" % genome_id)
-
                 annotation_store.copy(
                     "/annotations/%s" % genome_id,
-                    output_store["/genomes/annotations/%s" % genome_id]
+                    output_store["/genomes/annotations"]
                 )
     else:
         print("No /annotations/* found in store")
