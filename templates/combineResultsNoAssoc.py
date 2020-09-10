@@ -109,6 +109,10 @@ else:
         print("Filtering down to %d genomes which also have alignments" % len(genomes_to_keep))
         print("Copying to ${params.output_hdf}")
 
+        # Make sure that the /genomes/annotations/ group exists in the output HDF5
+        if "annotations" not in output_store["/genomes/"].keys():
+            output_store.create_group("/genomes/annotations")
+
         # Iterate over every genome available
         for genome_id in annotation_store["/annotations/"].keys():
             if genome_id in genomes_to_keep:
