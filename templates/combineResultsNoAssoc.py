@@ -49,15 +49,6 @@ containment_df.to_hdf(
     data_columns = ["genome", "CAG"]
 )
 
-# Make a set of those genomes for which any CAG has >= 10% of genes aligned
-genomes_to_keep = set(
-    containment_df.query(
-        "cag_prop >= 0.1"
-    )[
-        "genome"
-    ].tolist()
-)
-
 # Close the HDF5 store
 print("Closing the output store (pandas)")
 output_store.close()
@@ -70,6 +61,9 @@ output_store = h5py.File("${params.output_hdf}", "a")
 # Make the /genomes/details/ group
 genomes_detail_group = "/genomes/detail"
 output_store.create_group(genomes_detail_group)
+
+# Make a set of those genomes which have any alignment details saved
+genomes_to_keep = set([])
 
 # Write out the detailed tables of genome alignments, if there are any
 for fp in os.listdir("."):
@@ -92,6 +86,9 @@ for fp in os.listdir("."):
                     path,
                     output_store[genomes_detail_group]
                 )
+
+                # Record that this is one of the genomes with detailed alignments
+                genomes_to_keep.add(k)
 
 # Write out the genome annotations, if there are any
 print("Attempting to read annotations from genome_annotations.hdf5")
