@@ -49,26 +49,42 @@ containment_df.to_hdf(
     data_columns = ["genome", "CAG"]
 )
 
-# Write out the genome maps, if there are any
+# Make a set of those genomes for which any CAG has >= 10% of genes aligned
+genomes_to_keep = set(
+    containment_df.query(
+        "cag_prop >= 0.1"
+    )[
+        "genome"
+    ].tolist()
+)
+
+# Close the HDF5 store
+print("Closing the output store (pandas)")
+output_store.close()
+
+# Open the output HDF5 with h5py
+# This will make it easier to directly copy data into it
+print("Opening the output store (h5py)")
+output_store = h5py.File("${params.output_hdf}", "a")
+
+# Write out the detailed tables of genome alignments, if there are any
 for fp in os.listdir("."):
 
     # Parse any files with matching filenames
     if fp.startswith("genome_alignments.") and fp.endswith(".hdf5"):
 
         # Open up the file
-        with pd.HDFStore(fp, "r") as input_store:
+        with h5py.File(fp, "r") as input_store:
 
             # Iterate over every table
-            for k in input_store:
+            for k in input_store.keys():
 
-                # Read in the table
-                df = pd.read_hdf(input_store, k)
-
-                # Write to the output HDF
+                # Copy over the table
                 print("Writing alignment details for %s" % k)
-                df.to_hdf(output_store, k)
-
-output_store.close()
+                input_store.copy(
+                    k,
+                    output_store[k]
+                )
 
 # Write out the genome annotations, if there are any
 print("Attempting to read annotations from genome_annotations.hdf5")
@@ -87,25 +103,28 @@ if annotation_store is False:
 
 else:
 
-
-    # Append the annotations directly into the results
-    output_store = h5py.File("${params.output_hdf}", "a")
-
     if "annotations" in annotation_store.keys():
 
         print("Found %d annotations" % len(annotation_store["annotations"].keys()))
+        print("Filtering down to %d genomes which also have alignments" % len(genomes_to_keep))
         print("Copying to ${params.output_hdf}")
 
-        # Copy the entire group of annotations
-        annotation_store.copy(
-            "/annotations/",
-            output_store["/genomes/"]
-        )
+        # Iterate over every genome available
+        for genome_id in annotation_store["/annotations/"].keys():
+            if genome_id in genomes_to_keep:
+                print("Copying annotations for %s" % genome_id)
+
+                annotation_store.copy(
+                    "/annotations/%s" % genome_id,
+                    output_store["/genomes/annotations/%s" % genome_id]
+                )
     else:
         print("No /annotations/* found in store")
 
-    output_store.close()
     annotation_store.close()
 
     print("Done copying annotations")
 
+print("Closing the output store (h5py)")
+output_store.close()
+print("Done")
