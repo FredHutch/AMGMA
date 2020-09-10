@@ -136,6 +136,10 @@ output_store.close()
 print("Opening the output store (h5py)")
 output_store = h5py.File("${params.output_hdf}", "a")
 
+# Make the /genomes/details/ group
+genomes_detail_group = "/genomes/detail"
+output_store.create_group(genomes_detail_group)
+
 # Write out the detailed tables of genome alignments, if there are any
 for fp in os.listdir("."):
 
@@ -146,13 +150,16 @@ for fp in os.listdir("."):
         with h5py.File(fp, "r") as input_store:
 
             # Iterate over every table
-            for k in input_store.keys():
+            for k in input_store[genomes_detail_group].keys():
+
+                # Format the group for the table
+                path = "{}/{}".format(genomes_detail_group, k)
 
                 # Copy over the table
                 print("Writing alignment details for %s" % k)
                 input_store.copy(
-                    k,
-                    output_store[k]
+                    path,
+                    output_store[genomes_detail_group]
                 )
 
 # Write out the genome annotations, if there are any
@@ -178,14 +185,12 @@ else:
         print("Filtering down to %d genomes which also have alignments" % len(genomes_to_keep))
         print("Copying to ${params.output_hdf}")
 
-        # Make sure that the /genomes/annotations/ group exists in the output HDF5
-        if "annotations" not in output_store["/genomes/"].keys():
-            output_store.create_group("/genomes/annotations")
-
         # Iterate over every genome available
         for genome_id in annotation_store["/annotations/"].keys():
             if genome_id in genomes_to_keep:
                 print("Copying annotations for %s" % genome_id)
+
+                output_store.create_group("/genomes/annotations/%s" % genome_id)
 
                 annotation_store.copy(
                     "/annotations/%s" % genome_id,
