@@ -217,10 +217,6 @@ def process_genome(genome_id, genome_aln_df):
     print("%d / %d genes pass the CAG-level FDR threshold" % 
         (genome_aln_df_fdr.shape[0], genome_aln_df.shape[0]))
 
-    # Stop if no alignments pass this filter
-    if genome_aln_df_fdr.shape[0] == 0:
-        return
-
     # Return the summary metrics
     return dict([
         ("genome_id", genome_id),
@@ -228,8 +224,8 @@ def process_genome(genome_id, genome_aln_df):
         ("total_genes", genome_aln_df.shape[0]),
         ("n_pass_fdr", genome_aln_df_fdr.shape[0]),
         ("prop_pass_fdr", genome_aln_df_fdr.shape[0] / float(genome_aln_df.shape[0])),
-        ("mean_est_coef", genome_aln_df_fdr["estimate"].mean()),
-        ("mean_wald", genome_aln_df_fdr["wald"].mean()),
+        ("mean_est_coef", genome_aln_df["estimate"].mean()),
+        ("mean_wald", genome_aln_df["wald"].mean()),
     ])
 
 # Make sure that we have any alignments to summarize
