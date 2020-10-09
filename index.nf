@@ -14,6 +14,7 @@ nextflow.preview.dsl=2
 params.input = false
 params.output_prefix = false
 params.help = false
+params.aws_region = "us-east-1"
 
 // Set the containers to user
 container__glam = "quay.io/fhcrc-microbiome/glam-browser-v2:latest"
@@ -28,6 +29,9 @@ def helpMessage() {
     Arguments:
       --input               Geneshot results (".hdf5") file to process
       --output_prefix       Location in AWS S3 to write out indexed file objects
+
+    Optional arguments:
+      --aws_region          AWS Region for the output S3 bucket (default: us-east-1)
 
     """.stripIndent()
 }
@@ -51,6 +55,7 @@ process indexGeneshotResults {
 
     """#!/bin/bash
 
+AWS_REGION=${params.aws_region} \
 glam-cli index-dataset --fp "${input_hdf}" --uri "${params.output_prefix}"
 
     """
