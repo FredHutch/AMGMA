@@ -17,7 +17,7 @@ params.help = false
 params.aws_region = "us-east-1"
 
 // Set the containers to user
-container__glam = "quay.io/fhcrc-microbiome/glam-browser-v2:latest"
+container__glam = "quay.io/fhcrc-microbiome/glam-browser-v2@sha256:bea2c908205d5720afcd64f07e865b29d3f093303762c5dc33a9a584da78b918"
 
 // Function which prints help message text
 def helpMessage() {
