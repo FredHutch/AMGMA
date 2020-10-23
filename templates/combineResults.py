@@ -68,25 +68,32 @@ with h5py.File("associations.hdf5", "r") as input_store:
     # Copy all of the data from these two groups
     for group_name in ["/genomes/summary", "/genomes/map"]:
 
-        # Make the group in the output store
-        output_store.create_group(group_name)
+        # Make sure that the input data is present
+        if group_name in input_store:
 
-        print(f"Copying all data from {group_name} to output")
-        n = 0
+            # Make the group in the output store
+            output_store.create_group(group_name)
 
-        # Iterate over every table in the group
-        for k in input_store[group_name].keys():
+            print(f"Copying all data from {group_name} to output")
+            n = 0
 
-            # Format the group for the table
-            path = f"{group_name}/{k}"
+            # Iterate over every table in the group
+            for k in input_store[group_name].keys():
 
-            # Copy over the table
-            input_store.copy(
-                path,
-                output_store[group_name]
-            )
-            n += 1
-        print(f"Copied {n:,} tables")
+                # Format the group for the table
+                path = f"{group_name}/{k}"
+
+                # Copy over the table
+                input_store.copy(
+                    path,
+                    output_store[group_name]
+                )
+                n += 1
+            print(f"Copied {n:,} tables")
+
+        else:
+
+            print(f"No data present for {group_name}, skipping")
 
 print("Done copying association data")
 
