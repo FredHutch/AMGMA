@@ -53,79 +53,38 @@ containment_df.to_hdf(
     data_columns = ["genome", "CAG"]
 )
 
-# Keep track of all of the parameter summary information
-parameter_summaries = dict()
-
-# Iterate over each of the parameter association shards
-association_shard_hdf_list = [
-    fp
-    for fp in os.listdir(".")
-    if fp.startswith("association_shard") and fp.endswith(".hdf5")
-]
-for hdf_fp in association_shard_hdf_list:
-
-    # Open a connection to the input
-    with pd.HDFStore(hdf_fp, "r") as store:
-
-        # Iterate over every element in the HDF5
-        for k in store:
-
-            # Collection genome summary information
-            if k.startswith("/genomes/summary/"):
-                parameter_name = k.split("/")[-1]
-                print("Collecting summary information for %s" % parameter_name)
-                if parameter_name not in parameter_summaries:
-                    parameter_summaries[parameter_name] = []
-
-                parameter_summaries[parameter_name].append(
-                    pd.read_hdf(
-                        store,
-                        k
-                    )
-                )
-
-            # Write genome detailed information
-            elif k.startswith("/genomes/map/"):
-                print("Copying %s to output HDF" % k)
-
-                pd.read_hdf(
-                    store,
-                    k
-                ).to_hdf(
-                    output_store,
-                    k,
-                    format = "fixed",
-                    complevel = 5
-                )
-
-            else:
-                assert False, "Didn't expect %s" % k
-
-
-# Now write out all of the summary information for each parameter
-for parameter_name, genome_summary_list in parameter_summaries.items():
-
-    # Collapse all of the results into a single table
-    parameter_df = pd.concat(genome_summary_list)
-
-    print("Writing out details on %d genomes for %s" % (parameter_df.shape[0], parameter_name))
-
-    # Write out to the HDF
-    parameter_df.to_hdf(
-        output_store,
-        "/genomes/summary/%s" % parameter_name,
-        format = "fixed",
-        complevel = 5
-    )
-
-# Close the HDF5 store
-print("Closing the output store (pandas)")
-output_store.close()
-
 # Open the output HDF5 with h5py
 # This will make it easier to directly copy data into it
 print("Opening the output store (h5py)")
 output_store = h5py.File("${params.output_hdf}", "a")
+
+# Open the HDF5 with all of that association data available
+with h5py.File("associations.hdf5", "r") as input_store:
+
+    # Copy all of the data from these two groups
+    for group_name in ["/genomes/summary", "/genomes/map"]:
+
+        # Make the group in the output store
+        output_store.create_group(group_name)
+
+        print(f"Copying all data from {group_name} to output")
+        n = 0
+
+        # Iterate over every table in the group
+        for k in input_store[group_name].keys():
+
+            # Format the group for the table
+            path = f"{group_name}/{k}"
+
+            # Copy over the table
+            input_store.copy(
+                path,
+                output_store[group_name]
+            )
+            n += 1
+        print(f"Copied {n:,} tables")
+
+print("Done copying association data")
 
 # Make the /genomes/details/ group
 genomes_detail_group = "/genomes/detail"

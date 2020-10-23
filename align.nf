@@ -474,7 +474,37 @@ if (params.no_associations == false){
             template "formatResults.py"
     }
 
-    association_shard_hdf_list = association_shard_hdf.toSortedList()
+    // Join together the association data in batches of 100
+    process joinAssociationsRoundOne {
+        container "${container__pandas}"
+        label 'mem_medium'
+        errorStrategy "retry"
+
+        input:
+            file "association_shard.*.hdf5" from association_shard_hdf.toSortedList().collate(100)
+        
+        output:
+            file "joined_associations.hdf5" into joined_association_shard_hdf
+        
+        script:
+            template "joinAssociations.py"
+    }
+
+    // Join together all of those batches into a single file
+    process joinAssociationsRoundTwo {
+        container "${container__pandas}"
+        label 'mem_medium'
+        errorStrategy "retry"
+
+        input:
+            file "association_shard.*.hdf5" from joined_association_shard_hdf.toSortedList()
+        
+        output:
+            file "joined_associations.hdf5" into joined_associations_hdf
+        
+        script:
+            template "joinAssociations.py"
+    }
 
     // Collect results and combine across all shards
     process combineResults {
@@ -485,7 +515,7 @@ if (params.no_associations == false){
 
         input:
             file "containment_shard.*.csv.gz" from containment_shard_csv_gz_list
-            file "association_shard.*.hdf5" from association_shard_hdf_list
+            file "associations.hdf5" from joined_associations_hdf
             file geneshot_hdf
             file manifest_csv from valid_manifest_ch
             file "genome_alignments.*.hdf5" from genome_alignment_shards.toSortedList()
