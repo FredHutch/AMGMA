@@ -481,7 +481,7 @@ if (params.no_associations == false){
         errorStrategy "retry"
 
         input:
-            file "association_shard.*.hdf5" from association_shard_hdf.toSortedList().collate(100)
+            file "association_shard.*.hdf5" from association_shard_hdf.toSortedList().flatten().collate(100)
         
         output:
             file "joined_associations.hdf5" into joined_association_shard_hdf
