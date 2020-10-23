@@ -53,6 +53,10 @@ containment_df.to_hdf(
     data_columns = ["genome", "CAG"]
 )
 
+# Close the output file (with the pandas connector)
+print("Closing the pandas connection to the output store")
+output_store.close()
+
 # Open the output HDF5 with h5py
 # This will make it easier to directly copy data into it
 print("Opening the output store (h5py)")
