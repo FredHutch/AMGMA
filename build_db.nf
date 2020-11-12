@@ -31,6 +31,7 @@ include {combineRemoteFiles as combineRemoteFiles_fasta} from './modules/modules
 include {combineRemoteFiles as combineRemoteFiles_gff} from './modules/modules' params(
     tar_prefix: "genomes_gff"
 )
+include {prokka} from './modules/modules'
 include {repackHDF} from './modules/modules'
 
 // Function which prints help message text
@@ -116,16 +117,20 @@ workflow {
         file(params.manifest)
     ).splitCsv(
         header: true
-    ).filter(
-        { it.gff != null }
     ).map {
         r -> [r["id"], r["gff"]]
     }.branch {
+        missing: it[1] == null
         ftp: it[1].startsWith("ftp://")
         other: !it[1].startsWith("ftp://")
     }.set {
         split_gff_ch
     }
+
+    // Run Prokka on genomes which are missing annotations
+    prokka(
+        split_gff_ch.missing
+    )
 
     // Fetch files from FTP
     fetchFTP_gff(
@@ -144,6 +149,8 @@ workflow {
 
     // Now join the channels together
     gff_ch = combineRemoteFiles_gff.out.mix(
+        prokka.out
+    ).mix(
         fetchFTP_gff.out
     )
 
