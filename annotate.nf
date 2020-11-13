@@ -1,5 +1,7 @@
 #!/usr/bin/env nextflow
 
+nextflow.enable.dsl=2
+
 // Set default parameters
 params.help = false
 params.input = null
