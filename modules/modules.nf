@@ -119,6 +119,73 @@ echo Done
 
 }
 
+process preprocessFASTA {
+
+    container "quay.io/fhcrc-microbiome/integrate-metagenomic-assemblies:v0.5"
+    label "io_limited"
+    
+    input:
+    file fasta
+
+    output:
+    file "${fasta}"
+
+    """
+#!/usr/bin/env python3
+# Following criteria from https://github.com/ncbi/pgap/wiki/Input-Files
+from Bio.SeqIO.FastaIO import SimpleFastaParser
+import gzip
+import re
+# Sanitize and write out
+def preprocess_fasta(genome, handle):
+    seen_headers = set([])
+    
+    for header, seq in genome.items():
+        
+        # Make sure the sequence is >= 199 nucleotides
+        if len(seq) < 199:
+            continue
+        # Trim the header to 37 characters
+        if len(header) > 37:
+            header = header[:37]
+        # Only include letters, digits, hyphens (-), underscores (_), periods (.), colons (:), asterisks (*), and number signs (#)
+        header = re.sub('[^0-9a-zA-Z-.*#\$_:]', '_', header)
+        # All headers are unique
+        assert header not in seen_headers, "Duplicate header: %s (note truncation to first 37 characters)" % header
+        seen_headers.add(header)
+        # Make sure there are no N's at the beginning or end
+        assert seq[0] != "#"
+        assert seq[-1] != "#"
+        handle.write(">%s\\n%s\\n" % (header, seq))
+
+# Parse the filepath
+fasta_fp = "${fasta}"
+
+# Read in all of the genome
+if fasta_fp.endswith(".gz"):
+    genome = dict([
+        (header, seq)
+        for header, seq in SimpleFastaParser(gzip.open(fasta_fp, "rt"))
+    ])
+else:
+    genome = dict([
+        (header, seq)
+        for header, seq in SimpleFastaParser(open(fasta_fp, "r"))
+    ])
+
+# Gzip the output if appropriate
+if fasta_fp.endswith(".gz"):
+    with gzip.open(fasta_fp, "w") as handle:
+        preprocess_fasta(genome, handle)
+
+else:
+    with open(fasta_fp, "w") as handle:
+        preprocess_fasta(genome, handle)
+
+    """
+
+}
+
 // Combine remote files into tar files with ${batchsize} genomes each
 process combineRemoteFiles {
     container 'ubuntu:20.04'

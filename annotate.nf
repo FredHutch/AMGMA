@@ -11,6 +11,7 @@ params.output_folder = null
 include {prokka} from './modules/modules' params(
     output_folder: params.output_folder
 )
+include {preprocessFASTA} from './modules/modules'
 
 // Function which prints help message text
 def helpMessage() {
@@ -48,9 +49,13 @@ if (params.help || params.input == null || params.output_folder == null){
 
 workflow {
 
-    // Run Prokka on the inputs
-    prokka(
+    // Preprocess the input FASTAs
+    preprocessFASTA(
         Channel.fromPath(params.input)
+    )
+    // Run Prokka
+    prokka(
+        preprocessFASTA.out
     )
 
 }
