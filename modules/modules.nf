@@ -140,22 +140,36 @@ import re
 def preprocess_fasta(genome, handle):
     seen_headers = set([])
     
+    # Initialize the index counter
+    ix = 0
+
     for header, seq in genome.items():
         
         # Make sure the sequence is >= 199 nucleotides
         if len(seq) < 199:
             continue
-        # Trim the header to 37 characters
-        if len(header) > 37:
-            header = header[:37]
+        # Trim the header to 30 characters
+        if len(header) > 30:
+            header = header[:30]
+
         # Only include letters, digits, hyphens (-), underscores (_), periods (.), colons (:), asterisks (*), and number signs (#)
         header = re.sub('[^0-9a-zA-Z-.*#\$_:]', '_', header)
+
+        # Add the index
+        header = "%s_%d" % (header, ix)
+
+        # Increment the index counter
+        ix += 1
+
         # All headers are unique
-        assert header not in seen_headers, "Duplicate header: %s (note truncation to first 37 characters)" % header
+        assert header not in seen_headers, "Duplicate header: %s (note truncation to first 30 characters)" % header
+
         seen_headers.add(header)
+
         # Make sure there are no N's at the beginning or end
         assert seq[0] != "#"
         assert seq[-1] != "#"
+
         handle.write(">%s\\n%s\\n" % (header, seq))
 
 # Parse the filepath
