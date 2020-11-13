@@ -78,6 +78,43 @@ mv ${genome_fasta} TEMP && mv TEMP ${id}${params.file_suffix}
 """
 }
 
+process prokka {
+
+    container "quay.io/biocontainers/prokka:1.14.6--pl526_0"
+    label "mem_medium"
+    errorStrategy 'retry'
+    maxRetries 2
+    publishDir "${params.output_folder}", mode: 'copy', overwrite: true
+
+    input:
+    file fasta
+
+    output:
+    file "${fasta.name}/${fasta.name}.gff.gz"
+
+"""
+#!/bin/bash
+
+set -euxo pipefail
+
+echo Decompressing input FASTA
+gunzip -c "${fasta}" > "${fasta}.fasta"
+
+echo Running Prokka
+prokka \
+    --outdir "${fasta.name}" \
+    --prefix "${fasta.name}" \
+    --cpus ${task.cpus} \
+    "${fasta}.fasta"
+
+echo Compressing outputs
+
+gzip "${fasta.name}"/*
+
+echo Done
+"""
+
+}
 
 // Combine remote files into tar files with ${batchsize} genomes each
 process combineRemoteFiles {
