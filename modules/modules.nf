@@ -175,7 +175,7 @@ else:
 
 # Gzip the output if appropriate
 if fasta_fp.endswith(".gz"):
-    with gzip.open(fasta_fp, "w") as handle:
+    with gzip.open(fasta_fp, "wt") as handle:
         preprocess_fasta(genome, handle)
 
 else:
