@@ -100,6 +100,9 @@ set -euxo pipefail
 echo Decompressing input FASTA
 gunzip -c "${fasta}" > "${fasta}.fasta"
 
+# Remove the input file
+rm "${fasta}"
+
 echo Running Prokka
 prokka \
     --outdir "${fasta.name}" \
