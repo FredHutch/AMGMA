@@ -46,7 +46,11 @@ if (params.help || params.input == null || params.output_folder == null){
     exit 1
 }
 
-// Run Prokka on the inputs
-prokka(
-    Channel.fromPath(params.input)
-)
+workflow {
+
+    // Run Prokka on the inputs
+    prokka(
+        Channel.fromPath(params.input)
+    )
+
+}
