@@ -225,7 +225,7 @@ process combineGenomes {
 """
 #!/bin/bash
 
-set -e
+set -Eeuxo pipefail
 
 # Untar the set of genomes in this batch
 echo -e "\\nUnpacking input tarball"
@@ -255,6 +255,13 @@ for fp in *.fasta.gz; do
     gunzip -c \$fp | fgrep '>' | sed "s/>/\$genome_name,/" | sed 's/ .*//' >> combined_genomes.csv
 
 done
+
+# Make sure that every '>' is the start of a new line
+gunzip -c combined_genomes.fasta.gz | \
+    sed 's/>/\\n>/g' | \
+    sed '/^\$/d' | \
+    gzip -c > temp.fasta.gz
+mv temp.fasta.gz combined_genomes.fasta.gz
 
 echo -e "\\nNumber of headers in CSV \$( cat combined_genomes.csv | wc -l )"
 echo -e "\\nNumber of headers in FASTA \$( gunzip -c combined_genomes.fasta.gz | grep -c '>' )"
