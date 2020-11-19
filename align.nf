@@ -216,7 +216,7 @@ if (params.blast) {
 
         """#!/bin/bash
 
-        set -e
+        set -Eeuxo pipefail
 
         diamond getseq --db ${geneshot_dmnd} --out ref.fasta
 
@@ -238,7 +238,7 @@ if (params.blast) {
 
         """#!/bin/bash
 
-        set -e
+        set -Eeuxo pipefail
 
         echo "Decompressing gene catalog FASTA"
         gunzip -c ${ref_fasta} > ref.fasta
@@ -270,7 +270,7 @@ if (params.blast) {
     """
     #!/bin/bash
 
-    set -e
+    set -Eeuxo pipefail
 
     ls -lahtr
 
@@ -350,7 +350,7 @@ df.to_csv("${aln_tsv_gz}.filtered.tsv.gz", sep="\\t", index=None, header=None)
     """
     #!/bin/bash
 
-    set -e
+    set -Eeuxo pipefail
 
     ls -lahtr
 
@@ -571,7 +571,7 @@ process repackHDF {
     """
 #!/bin/bash
 
-set -e
+set -Eeuxo pipefail
 
 [ -s ${final_hdf} ]
 
