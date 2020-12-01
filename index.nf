@@ -15,9 +15,10 @@ params.input = false
 params.output_prefix = false
 params.help = false
 params.aws_region = "us-east-1"
+params.branch = 'latest'
 
 // Set the containers to user
-container__glam = "quay.io/fhcrc-microbiome/glam-browser-v2:latest"
+container__glam = "quay.io/fhcrc-microbiome/glam-browser-v2:${params.branch}"
 
 // Function which prints help message text
 def helpMessage() {
@@ -32,6 +33,7 @@ def helpMessage() {
 
     Optional arguments:
       --aws_region          AWS Region for the output S3 bucket (default: us-east-1)
+      --branch              Branch of the `glam-browser-v2` repo to use for indexing (default: latest)
 
     """.stripIndent()
 }
