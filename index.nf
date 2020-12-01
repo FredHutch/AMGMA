@@ -12,6 +12,7 @@ nextflow.preview.dsl=2
 // If these are not set by the user, then they will be set to the values below
 // This is useful for the if/then control syntax below
 params.input = false
+params.details = false
 params.output_prefix = false
 params.help = false
 params.aws_region = "us-east-1"
@@ -29,6 +30,7 @@ def helpMessage() {
     
     Arguments:
       --input               Geneshot results (".hdf5") file to process
+      --details             Geneshot details (".hdf5") file to process
       --output_prefix       Location in AWS S3 to write out indexed file objects
 
     Optional arguments:
@@ -53,12 +55,13 @@ process indexGeneshotResults {
     errorStrategy 'retry'
 
     input:
-    path input_hdf
+    path summary_hdf
+    path details_hdf
 
     """#!/bin/bash
 
 AWS_REGION=${params.aws_region} \
-glam-cli index-dataset --fp "${input_hdf}" --uri "${params.output_prefix}"
+glam-cli index-dataset --fp "${summary_hdf}" --uri "${params.output_prefix} --details "${details_hdf}"
 
     """
 }
@@ -67,7 +70,8 @@ workflow {
 
   // Index the input file
   indexGeneshotResults(
-    Channel.fromPath(params.input)
+    Channel.fromPath(params.input),
+    Channel.fromPath(params.details),
   )
 
 }
