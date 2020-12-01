@@ -61,7 +61,7 @@ process indexGeneshotResults {
     """#!/bin/bash
 
 AWS_REGION=${params.aws_region} \
-glam-cli index-dataset --fp "${summary_hdf}" --uri "${params.output_prefix} --details "${details_hdf}"
+glam-cli index-dataset --fp "${summary_hdf}" --uri "${params.output_prefix}" --details "${details_hdf}"
 
     """
 }
