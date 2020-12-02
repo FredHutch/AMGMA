@@ -59,12 +59,15 @@ process indexGeneshotResults {
     path summary_hdf
     path details_hdf
 
+    output:
+    file "OUTPUT/**"
+
     """#!/bin/bash
 
 set -Eeuxo pipefail
 
 AWS_REGION=${params.aws_region} \
-glam-cli index-dataset --fp "${summary_hdf}" --uri "\$PWD" --details "${details_hdf}"
+glam-cli index-dataset --fp "${summary_hdf}" --uri "\$PWD/OUTPUT" --details "${details_hdf}"
 
     """
 }
