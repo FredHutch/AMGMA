@@ -53,6 +53,7 @@ process indexGeneshotResults {
     container "${container__glam}"
     label "mem_veryhigh"
     errorStrategy 'retry'
+    publishDir "${params.output_prefix}", mode: 'copy', overwrite: true
 
     input:
     path summary_hdf
@@ -60,8 +61,10 @@ process indexGeneshotResults {
 
     """#!/bin/bash
 
+set -Eeuxo pipefail
+
 AWS_REGION=${params.aws_region} \
-glam-cli index-dataset --fp "${summary_hdf}" --uri "${params.output_prefix}" --details "${details_hdf}"
+glam-cli index-dataset --fp "${summary_hdf}" --uri "\$PWD" --details "${details_hdf}"
 
     """
 }
