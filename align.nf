@@ -3,21 +3,21 @@
 // Set default parameters
 params.help = false
 params.db = null
-params.geneshot_hdf = null
+params.geneshot_folder = null
+params.geneshot_results_hdf = null
+params.geneshot_details_hdf = null
 params.geneshot_fasta = null
-params.output_hdf = null
+params.output_folder = null
+params.output_prefix = null
 params.min_coverage = 50
-params.min_identity = 90
-params.top = 50
+params.min_identity = 80
+params.top = 5
 params.fdr_method = "fdr_bh"
 params.alpha = 0.2
-params.filter = false
-params.details = false
 params.blast = false
 params.no_associations = false
 params.min_cag_size = 5
 params.min_cag_prop = 0.25
-params.window_size = 5
 
 // Commonly used containers
 container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.0.3_py38_h5py"

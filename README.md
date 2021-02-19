@@ -74,8 +74,8 @@ Required Arguments:
                           [overridden by --geneshot_results_hdf]
                         - Detailed HDF file output by geneshot (*details.hdf5)
                           [overridden by --geneshot_detail_hdf]
-                        - DIAMOND database for the gene catalog (annot/ref.dmnd)
-                          [overridden by --geneshot_dmnd]
+                        - FASTA file containing the gene catalog (annot/ref.fasta.gz)
+                          [overridden by --geneshot_fasta]
 --output_folder       Folder used to write outputs
 --output_prefix       Prefix appended to files in the output directory
 
