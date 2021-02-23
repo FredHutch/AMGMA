@@ -3,8 +3,15 @@
 import pandas as pd
 import os
 import pickle
+import sys
 
 pickle.HIGHEST_PROTOCOL = 4
+
+# Parse input arguments
+aln_tsv_gz = sys.argv[1]
+header_csv_gz = sys.argv[2]
+geneshot_hdf = sys.argv[3]
+min_genes_per_cag = int((sys.argv[4]))
 
 # In this task we will calculate the containment for each genome against each CAG
 
@@ -14,11 +21,19 @@ pickle.HIGHEST_PROTOCOL = 4
 
 # Read in mapping of genes to CAGs
 gene_cag_map = pd.read_hdf(
-    "${geneshot_hdf}", 
+    geneshot_hdf, 
     "/annot/gene/all"
+)
+
+# Remove all genes which are lacking a CAG assignment
+gene_cag_map = gene_cag_map.loc[
+    gene_cag_map["CAG"].dropna().index
+].reset_index(
+    drop=True
 ).set_index(
     "gene"
 )
+
 print("Read in sizes of %d CAGs containing %d genes" % (gene_cag_map["CAG"].unique().shape[0], gene_cag_map.shape[0]))
 
 ######################
@@ -33,10 +48,8 @@ cag_size = gene_cag_map["CAG"].value_counts()
 #######################
 
 # Dict mapping contig names to genome IDs
-print("Reading in ${header_csv_gz}")
-contig_headers = pd.read_csv(
-    "${header_csv_gz}"
-)
+print(f"Reading in {header_csv_gz}")
+contig_headers = pd.read_csv(header_csv_gz)
 assert contig_headers["contig"].unique().shape[0] == contig_headers.shape[0], "Found duplicate contig names"
 contig_headers = contig_headers.set_index(
     "contig"
@@ -47,9 +60,9 @@ contig_headers = contig_headers.set_index(
 ##########################
 
 # Read in the alignments of reference genomes against the gene catalog genes
-print("Reading in ${aln_tsv_gz}")
+print(f"Reading in {aln_tsv_gz}")
 aln_df = pd.read_csv(
-    "${aln_tsv_gz}", 
+    aln_tsv_gz, 
     sep="\\t", 
     header=None,
     compression="gzip",
@@ -80,9 +93,12 @@ print("Read in %d gene alignments for %d genomes" % (aln_df.shape[0], aln_df["ge
 
 
 print("Adding CAG labels")
+print(aln_df.head(1).T)
+print(gene_cag_map.head())
 aln_df = aln_df.assign(
     CAG = aln_df["gene"].apply(gene_cag_map["CAG"].get)
 )
+print(aln_df.head(1).T)
 
 # Remove any genes which don't have a CAG label
 print("%d / %d genes have a valid CAG label" % (aln_df["CAG"].dropna().shape[0], aln_df.shape[0]))
@@ -111,17 +127,22 @@ def calc_containment(df, cag_id, n_genes_in_cag):
     ).drop_duplicates(
     )["contig_len"].sum()
 
+    assert genome_size_bases > 0, df.head()
+
     # First calculate the proportion of this genome which is captured by this CAG
-    cag_genome_bases = df.query("CAG == '%s'" % cag_id)["span"].sum()
+    cag_genome_bases = df.query("CAG == %s" % cag_id)["span"].sum()
+    assert cag_genome_bases > 0, (df.head(), "CAG == %s" % cag_id)
     genome_prop = cag_genome_bases / genome_size_bases
+    assert genome_prop > 0
 
     # Second calculate the proportion of the unique genes in this CAG captured in this genome
     cag_prop = df.query(
-        "CAG == '%s'" % cag_id
+        "CAG == %s" % cag_id
     )[
         "gene"
     ].unique(
     ).shape[0] / float(n_genes_in_cag)
+    assert cag_prop > 0
 
     # Return the larger of the two
     return [
@@ -157,20 +178,7 @@ for genome_id, genome_df in aln_df.groupby("genome_id"):
     ])
 
 # Function to write out a set of alignments
-def filter_alignment(genome_df, min_cag_size=5, min_cag_prop=0.25):
-
-    # Filter genes based on CAG size
-    df = genome_df.assign(
-        CAG_size = genome_df["CAG"].apply(cag_size.get)
-    ).query(
-        "CAG_size >= %d" % min_cag_size
-    ).drop(
-        columns="CAG_size"
-    )
-
-    # Stop if no alignments pass this filter
-    if df.shape[0] == 0:
-        return
+def filter_alignment(df):
 
     # Calculate the number of unique genes from each CAG which was found
     cag_genes_found = df.reindex(
@@ -182,13 +190,11 @@ def filter_alignment(genome_df, min_cag_size=5, min_cag_prop=0.25):
 
     # Filter genes based on the proportion of each CAG which was found
     df = df.assign(
-        CAG_prop = df["CAG"].apply(
-            lambda cag_id: cag_genes_found[cag_id] / cag_size[cag_id]
-        )
+        genes_per_cag = df["CAG"].apply(cag_genes_found.get)
     ).query(
-        "CAG_prop >= %s" % ${params.min_cag_prop}
+        f"genes_per_cag >= {min_genes_per_cag}"
     ).drop(
-        columns="CAG_prop"
+        columns="genes_per_cag"
     )
 
     # Stop if no alignments pass this filter
@@ -209,55 +215,48 @@ else:
     genome_containment_df = pd.DataFrame(genome_containment)
     assert genome_containment_df.shape[0] > 0, "Problem calculating containment values"
     
-    genome_containment_df["CAG"] = genome_containment_df["CAG"].apply(int).apply(str)    
+    genome_containment_df["CAG"] = genome_containment_df["CAG"].apply(int).apply(str)
 
     genome_containment_df.to_csv(
-        "genome_containment_shard.${header_csv_gz.name}", # File name will end with .csv.gz
+        f"genome_containment_shard.{header_csv_gz}", # File name will end with .csv.gz
         sep = ",",
         compression = "gzip",
         index = None
     )
 
-    # If --details has been specified, write out the map of alignments for each genome
-    if "${params.details}" != "false":
+    # First compute the filtered alignment for each genome
+    filtered_alignments = {
+        genome_id: filter_alignment(genome_df)
+        for genome_id, genome_df in aln_df.groupby("genome_id")
+    }
 
-        # First compute the filtered alignment for each genome
-        filtered_alignments = {
-            genome_id: filter_alignment(
-                genome_df,
-                min_cag_size=${params.min_cag_size},
-                min_cag_prop=${params.min_cag_prop},
-            )
-            for genome_id, genome_df in aln_df.groupby("genome_id")
-        }
+    # Remove the genomes which did not survive filtering
+    filtered_alignments = {
+        k: v
+        for k, v in filtered_alignments.items()
+        if v is not None
+    }
 
-        # Remove the genomes which did not survive filtering
-        filtered_alignments = {
-            k: v
-            for k, v in filtered_alignments.items()
-            if v is not None
-        }
+    # If any remain, write to HDF
+    if len(filtered_alignments) > 0:
 
-        # If any remain, write to HDF
-        if len(filtered_alignments) > 0:
+        hdf_fp = f"genome_containment_shard.{header_csv_gz}.hdf5"
+        with pd.HDFStore(hdf_fp, "w") as store:
+            for genome_id, genome_df in filtered_alignments.items():
 
-            hdf_fp = "genome_containment_shard.${header_csv_gz.name}.hdf5"
-            with pd.HDFStore(hdf_fp, "w") as store:
-                for genome_id, genome_df in filtered_alignments.items():
-
-                    # Only save the most essential data
-                    genome_df.reindex(
-                        columns = [
-                            "contig",
-                            "gene",
-                            "pident",
-                            "contig_start",
-                            "contig_end",
-                            "contig_len",
-                            "genome_id",
-                            "CAG",
-                        ]
-                    ).to_hdf(
-                        store,
-                        "/genomes/detail/%s" % genome_id
-                    )
+                # Only save the most essential data
+                genome_df.reindex(
+                    columns = [
+                        "contig",
+                        "gene",
+                        "pident",
+                        "contig_start",
+                        "contig_end",
+                        "contig_len",
+                        "genome_id",
+                        "CAG",
+                    ]
+                ).to_hdf(
+                    store,
+                    "/genomes/detail/%s" % genome_id
+                )
