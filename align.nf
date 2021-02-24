@@ -241,10 +241,12 @@ workflow {
     // Collect results and combine across all shards
     combineResults(
         calculateContainment.out[0].toSortedList(),
+        calculateContainment.out[1].toSortedList(),
         extractCounts.out[1].toSortedList(),
         joinCorncob.out,
         unpackDatabase.out[0],
         unpackDatabase.out[2],
+        geneshot_details_hdf,
         geneshot_results_hdf,
         geneshot_rdb
     )
@@ -657,6 +659,7 @@ process formatResults {
         template "formatResults.py"
 }
 
+
 // Collect results and combine across all shards
 process combineResults {
     container "${container__pandas}"
@@ -665,10 +668,12 @@ process combineResults {
 
     input:
         file "containment_shard.*.csv.gz"
+        file "containment_shard.*.hdf5"
         file "abundance_shard.*.csv.gz"
         file "corncob.results.csv"
         file "genome.manifest.csv"
         file "genome.annotations.hdf5"
+        file "geneshot.details.hdf5"
         file "geneshot.results.hdf5"
         file "geneshot.results.rdb"
     
@@ -679,7 +684,7 @@ process combineResults {
 
 """#!/bin/bash
 
-combineResults.py "${params.output_prefix}.hdf5"
+combineResults.py "${params.output_prefix}"
 
 # Rename the genome annotations HDF5
 mv genome.annotations.hdf5 ${params.output_prefix}.annotations.hdf5
