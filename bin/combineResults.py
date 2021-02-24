@@ -734,6 +734,18 @@ class collectResults:
             "specimen_nnls_genome"
         )
 
+        # Save the average abundance across all specimens
+        self.logger.info("Saving mean_abundance_genomes")
+        self.r.set(
+            "mean_abundance_genomes",
+            raw_abund.mean(axis=1)
+        )
+        self.logger.info("Saving mean_nnls_genomes")
+        self.r.set(
+            "mean_nnls_genomes",
+            nnls_abund.mean(axis=1)
+        )
+
         # Now save the abundances per-specimen to HDF
         for df, hdf_prefix in [
             (raw_abund, "/genome/abund/raw"),
