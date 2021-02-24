@@ -276,12 +276,6 @@ class collectResults:
             if k in self.genome_manifest.columns.values:
                 self.genome_manifest = self.genome_manifest.drop(columns=k)
 
-        ###################
-        # CORNCOB RESULTS #
-        ###################
-
-        self.corncob_df = self.read_corncob_results("corncob.results.csv")
-
         ####################
         # GENE ANNOTATIONS #
         ####################
@@ -416,13 +410,15 @@ class collectResults:
     # Save the corncob results table
     def write_corncob_results(self, output_store):
 
+        corncob_df = self.read_corncob_results("corncob.results.csv")
+
         self.logger.info("Writing to /stats/genome/corncob")
-        self.corncob_df.to_hdf(
+        corncob_df.to_hdf(
             output_store,
             "/stats/genome/corncob"
         )
 
-        for parameter, parameter_df in self.corncob_df.groupby("parameter"):
+        for parameter, parameter_df in corncob_df.groupby("parameter"):
             # Skip the intercept
             if parameter == "(Intercept)":
                 continue
@@ -477,6 +473,18 @@ class collectResults:
         # Add the wald metric
         corncob_wide = corncob_wide.assign(
             wald=corncob_wide["estimate"] / corncob_wide["std_error"]
+        )
+
+        # Convert the genome accession to the integer genome index,
+        # and use that to set the index
+        corncob_wide = corncob_wide.assign(
+            genome_ix = corncob_wide["genome"].apply(
+                lambda acc: self.genome_index_map[acc]
+            )
+        ).drop(
+            columns="genome"
+        ).set_index(
+            "genome_ix"
         )
 
         return corncob_wide
