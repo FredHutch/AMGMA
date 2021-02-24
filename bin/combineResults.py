@@ -470,6 +470,9 @@ class collectResults:
                     self.fdr_method
                 )[1]
             )
+            corncob_wide = corncob_wide.assign(
+                neg_log10_qvalue=corncob_wide["q_value"].apply(np.log10) * -1
+            )
 
         # Add the wald metric
         corncob_wide = corncob_wide.assign(
