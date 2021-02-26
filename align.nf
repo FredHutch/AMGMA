@@ -21,9 +21,11 @@ params.blast = false
 params.no_associations = false
 // Only show alignments for CAGs with at least this number of genes aligned
 params.min_genes_per_cag = 2
+// Align against any contigs with this minimum size (or circular)
+params.min_contig_len = 25000
 
 // Commonly used containers
-container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.2.1_latest"
+container__pandas = "quay.io/fhcrc-microbiome/python-pandas:v1.2.1_fastcluster"
 container_diamond = "quay.io/fhcrc-microbiome/docker-diamond:v2.0.6-biopython"
 container__blast = "ncbi/blast:2.11.0"
 
@@ -162,10 +164,27 @@ workflow {
     // Unpack the database(s)
     unpackDatabase(db_ch)
 
+    // Make a channel with any assemblies available
+    contig_fasta_ch = Channel.fromPath(
+        "${params.geneshot_folder}**.contigs.fasta.gz"
+    )
+
+    // Extract the long contigs from those assemblies
+    filterContigs(
+        contig_fasta_ch
+    )
+
+    // Make a channel with all references in tar format
+    genomes_tar_ch = unpackDatabase.out[1].flatten().mix(
+        filterContigs.out[1]
+    )
+
     // If multiple databases were provided, join the manifests
     // Make sure that there are no overlapping IDs
     validateManifest(
-        unpackDatabase.out[0].toSortedList()
+        unpackDatabase.out[0].mix(
+            filterContigs.out[0]
+        ).toSortedList()
     )
 
     // If using BLAST+, format the database
@@ -183,7 +202,7 @@ workflow {
 
         // Align the genomes against the database with BLAST
         alignGenomesBLAST(
-            unpackDatabase.out[1].flatten(),
+            genomes_tar_ch,
             makeBLASTdb.out
         )
 
@@ -198,7 +217,7 @@ workflow {
 
         // Align the genomes against the database with DIAMOND
         alignGenomes(
-            unpackDatabase.out[1].flatten(),
+            genomes_tar_ch,
             geneshot_dmnd
         )
 
@@ -391,7 +410,7 @@ process extractFASTA {
         file geneshot_dmnd
     
     output:
-        file "ref.fasta.gz" // into ref_fasta
+        file "ref.fasta.gz"
 
 
     """#!/bin/bash
@@ -477,7 +496,7 @@ process filterBLASThits {
         tuple file(aln_tsv_gz), file(header_csv_gz)
 
     output:
-        tuple file("${aln_tsv_gz}.filtered.tsv.gz"), file("${header_csv_gz}") // into alignments_ch
+        tuple file("${aln_tsv_gz}.filtered.tsv.gz"), file("${header_csv_gz}")
 
 """#!/usr/bin/env python3
 
@@ -505,6 +524,121 @@ print("Filtered down to %d alignments with coverage >= ${params.min_coverage}" %
 
 # Write out
 df.to_csv("${aln_tsv_gz}.filtered.tsv.gz", sep="\\t", index=None, header=None)
+
+"""
+}
+
+
+// Filter assemblies to just those contigs of a certain size
+process filterContigs {
+    container "${container__pandas}"
+    label "io_limited"
+
+    input:
+        file contig_fasta_gz
+
+    output:
+        file "${contig_fasta_gz}.manifest.csv" optional true
+        file "${contig_fasta_gz}.tar" optional true
+
+"""#!/usr/bin/env python3
+
+import gzip
+import pandas as pd
+import tarfile
+
+def fasta_gz_parser(fp):
+    with gzip.open(fp, 'rt') as handle:
+        header = None
+        seq = None
+        for l in handle:
+            if l.startswith(">"):
+                if header is not None and seq is not None:
+                    yield header, seq
+                header = l.lstrip(">").rstrip("\\n")
+                seq = ""
+            else:
+                seq = seq + l.rstrip("\\n")
+
+    if header is not None and seq is not None:
+        yield header, seq
+
+def is_circular(seq, min_k=15, max_k=31):
+    for k in range(min_k, max_k + 1):
+        if seq[:k] == seq[-k:]:
+            return True
+    return False
+
+# Make a genome manifest with columns 'name' and 'id'
+genome_manifest = []
+
+# Make a contig manifest with columns 'genome' and 'contig'
+contig_manifest = []
+
+# The output will have a *fastq.gz and *contig.manifest.csv.gz in a tarball,
+# as well as the genome manifest in a separate file
+
+# Filter the contigs
+filtered_contigs = [
+    (header, seq)
+    for header, seq in fasta_gz_parser("${contig_fasta_gz}")
+    if len(seq) >= ${params.min_contig_len} or (len(seq) >= 1000 and is_circular(seq))
+]
+
+# Parse the specimen name
+specimen_name = "${contig_fasta_gz}".replace(".contigs.fasta.gz", "")
+
+# Format the names of the files to write out
+filtered_contigs_path = "${contig_fasta_gz}.fasta.gz"
+filtered_contig_manifest_path = "${contig_fasta_gz}.csv.gz"
+
+# If there are any contigs which pass the filter
+if len(filtered_contigs) > 0:
+
+    # Write out the contigs
+    with gzip.open(filtered_contigs_path, "wt") as handle_out:
+
+        # Iterate over every contig which passes the filter
+        for header, seq in filtered_contigs:
+
+            # Write out the contig
+            handle_out.write(
+                ">%s\\n%s\\n" % (header, seq)
+            )
+
+            # Save the contig to both manifest tables
+            genome_manifest.append(dict(
+                name=header,
+                id=header
+            ))
+            contig_manifest.append(dict(
+                genome=header,
+                contig=header
+            ))
+
+    # Write out both manifests
+    pd.DataFrame(
+        genome_manifest
+    ).to_csv(
+        "${contig_fasta_gz}.manifest.csv",
+        index=None
+    )
+
+    pd.DataFrame(
+        contig_manifest
+    ).to_csv(
+        filtered_contig_manifest_path,
+        index=None
+    )
+
+    # Tar up the filtered contigs
+    with tarfile.open("${contig_fasta_gz}.tar", "w") as tar:
+        tar.add(
+            filtered_contig_manifest_path
+        )
+        tar.add(
+            filtered_contigs_path
+        )
 
 """
 }
@@ -549,6 +683,9 @@ diamond \
     -F 1 \
     --block-size ${task.memory.toMega() / (1024 * 6 * task.attempt)} \
     --threads ${task.cpus} \
+    -c1
+
+ls -lahtr
 
 """
 }
@@ -663,7 +800,7 @@ process formatResults {
 // Collect results and combine across all shards
 process combineResults {
     container "${container__pandas}"
-    label 'mem_veryhigh'
+    label 'mem_medium'
     publishDir "${params.output_folder}"
 
     input:
@@ -684,10 +821,31 @@ process combineResults {
 
 """#!/bin/bash
 
-combineResults.py "${params.output_prefix}"
+set -Eeuo pipefail
 
-# Rename the genome annotations HDF5
-mv genome.annotations.hdf5 ${params.output_prefix}.annotations.hdf5
+# Start a redis server in the background
+redis-server \
+    --port 6379 \
+    --bind 127.0.0.1 \
+    --rdbcompression yes \
+    --dbfilename ${params.output_prefix}.rdb \
+    --dir \$PWD &
+
+combineResults.py \
+    --output_prefix "${params.output_prefix}" \
+    --port 6379 \
+    --host 127.0.0.1 || \
+    redis-cli shutdown  # In case of failure
+
+# Save the redis store
+echo "Saving the redis store"
+redis-cli save
+
+# Shutdown the redis server
+echo "Shutting down the redis server"
+redis-cli shutdown
+
+echo "Done"
 """
 
 }
