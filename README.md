@@ -149,6 +149,7 @@ The keys populated in that database are as follows:
 * `genome_nnls_specimen <genome_id>`: Series with `<specimen>:<NNLS-based abundance of genome>`
 * `specimen_nnls_genome <specimen>`: Series with `<genome_id>:<NNLS-based abundance of genome>`
 * `mean_abundance_genomes`: Dict with `<genome index>:<mean abundance>`
+* `mean_nnls_genomes`: Dict with `<genome index>:<mean NNLS-based abundance>`
 
 ### How AMGMA Works
 
