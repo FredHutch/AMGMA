@@ -1,4 +1,0 @@
-[submodule "geneshot"]
-	path = geneshot
-	url = https://github.com/golob-minot/geneshot
-	branch = v0.9
