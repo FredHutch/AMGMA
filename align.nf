@@ -33,7 +33,7 @@ container__blast = "ncbi/blast:2.11.0"
 include { 
     runCorncob;
     joinCorncob
-} from './geneshot/modules/statistics.nf'
+} from './modules/statistics.nf'
 
 // Function which prints help message text
 def helpMessage() {
