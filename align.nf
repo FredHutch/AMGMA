@@ -263,7 +263,7 @@ workflow {
         calculateContainment.out[1].toSortedList(),
         extractCounts.out[1].toSortedList(),
         joinCorncob.out,
-        unpackDatabase.out[0],
+        validateManifest.out,
         unpackDatabase.out[2],
         geneshot_details_hdf,
         geneshot_results_hdf,
