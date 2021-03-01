@@ -178,7 +178,6 @@ workflow {
     genomes_tar_ch = unpackDatabase.out[1].flatten().mix(
         filterContigs.out[1]
     )
-    genomes_tar_ch.view()
 
     // If multiple databases were provided, join the manifests
     // Make sure that there are no overlapping IDs
