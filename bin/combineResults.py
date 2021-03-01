@@ -270,11 +270,11 @@ class collectResults:
         # GENOME MANIFEST #
         ###################
         
-        self.genome_manifest = pd.read_csv("genome.manifest.csv")
-        # Remove URI columns
-        for k in ['uri', 'gff']:
-            if k in self.genome_manifest.columns.values:
-                self.genome_manifest = self.genome_manifest.drop(columns=k)
+        self.genome_manifest = pd.read_csv(
+            "genome.manifest.csv"
+        ).reindex(
+            columns=["id", "name"]
+        )
 
         ####################
         # GENE ANNOTATIONS #
@@ -334,7 +334,8 @@ class collectResults:
         ).reindex(
             index=self.genomes_to_keep
         ).dropna(
-        ).reset_index()
+        ).reset_index(
+        )
 
         # Make sure that the number of genomes match
         msg = (self.genome_manifest.shape[0], len(self.genomes_to_keep))
@@ -497,7 +498,10 @@ class collectResults:
         genomes_detail_group = "/genomes/detail/"
 
         # Make a set of those genomes which have any alignment details saved
-        self.genomes_to_keep = list()
+        self.genomes_to_keep = self.containment_df[
+            "genome"
+        ].drop_duplicates(
+        ).tolist()
 
         # Populate a dict of dicts, recording the genomes which are aligned
         # to genes which are assigned to a given taxa
@@ -541,9 +545,18 @@ class collectResults:
                             k
                         )
 
-                        # Record that this is one of the genomes with detailed alignments
-                        genome_ix = len(self.genomes_to_keep)
-                        self.genomes_to_keep.append(genome_acc)
+                        # Check to see if this genome is already in the list of genomes to keep
+                        if genome_acc in self.genomes_to_keep:
+                            
+                            # If so, get the index position
+                            genome_ix = self.genomes_to_keep.index(genome_acc)
+
+                        # Otherwise, this is new
+                        else:
+
+                            # Add it to the list and get the updated index
+                            genome_ix = len(self.genomes_to_keep)
+                            self.genomes_to_keep.append(genome_acc)
 
                         # To save this to redis, we'll first need to
                         # make an index of the contig lengths
