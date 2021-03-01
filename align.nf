@@ -845,6 +845,9 @@ redis-cli save
 echo "Shutting down the redis server"
 redis-cli shutdown
 
+# Rename the annotations HDF5, if any
+mv genome.annotations.hdf5 "${params.output_prefix}.annotations.hdf5"
+
 echo "Done"
 """
 
