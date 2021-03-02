@@ -828,7 +828,7 @@ redis-server \
     --port 6379 \
     --bind 127.0.0.1 \
     --rdbcompression yes \
-    --dbfilename ${params.output_prefix}.rdb \
+    --dbfilename geneshot.results.rdb \
     --dir \$PWD &
 
 combineResults.py \
@@ -845,7 +845,8 @@ redis-cli save
 echo "Shutting down the redis server"
 redis-cli shutdown
 
-# Rename the annotations HDF5, if any
+# Rename the redis DB and annotations HDF5, if any
+mv geneshot.results.rdb "${params.output_prefix}.rdb"
 mv genome.annotations.hdf5 "${params.output_prefix}.annotations.hdf5"
 
 echo "Done"
