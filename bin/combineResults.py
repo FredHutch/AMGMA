@@ -721,8 +721,8 @@ class collectResults:
         # Make a dict of the abundance for each genome in each specimen
         raw_abund = defaultdict(lambda: dict())
         
-        # Make a second dict with the NNLS abundance
-        nnls_abund = defaultdict(lambda: dict())
+        # # Make a second dict with the NNLS abundance
+        # nnls_abund = defaultdict(lambda: dict())
 
         # Read the abundances for each specimen from the details HDF5
         for specimen_name, specimen_abund in self.parse_specimen_abundance():
@@ -738,13 +738,13 @@ class collectResults:
                     0
                 ).sum()
 
-            # Run NNLS to infer the unique abundance per genome
-            for genome_ix, genome_abund in self.run_nnls(specimen_abund).items():
-                nnls_abund[specimen_name][genome_ix] = genome_abund
+            # # Run NNLS to infer the unique abundance per genome
+            # for genome_ix, genome_abund in self.run_nnls(specimen_abund).items():
+            #     nnls_abund[specimen_name][genome_ix] = genome_abund
 
         # Transform the abundances to a DataFrame
         raw_abund = pd.DataFrame(raw_abund).fillna(0)
-        nnls_abund = pd.DataFrame(nnls_abund).fillna(0)
+        # nnls_abund = pd.DataFrame(nnls_abund).fillna(0)
 
         # Save the abundances per-genome and per-specimen to redis
         self.save_abundance_table(
@@ -752,11 +752,11 @@ class collectResults:
             "genome_abundance_specimen",
             "specimen_abundance_genome"
         )
-        self.save_abundance_table(
-            nnls_abund,
-            "genome_nnls_specimen",
-            "specimen_nnls_genome"
-        )
+        # self.save_abundance_table(
+        #     nnls_abund,
+        #     "genome_nnls_specimen",
+        #     "specimen_nnls_genome"
+        # )
 
         # Save the average abundance across all specimens
         self.logger.info("Saving mean_abundance_genomes")
@@ -764,16 +764,16 @@ class collectResults:
             "mean_abundance_genomes",
             raw_abund.mean(axis=1)
         )
-        self.logger.info("Saving mean_nnls_genomes")
-        self.r.set(
-            "mean_nnls_genomes",
-            nnls_abund.mean(axis=1)
-        )
+        # self.logger.info("Saving mean_nnls_genomes")
+        # self.r.set(
+        #     "mean_nnls_genomes",
+        #     nnls_abund.mean(axis=1)
+        # )
 
         # Now save the abundances per-specimen to HDF
         for df, hdf_prefix in [
             (raw_abund, "/genome/abund/raw"),
-            (nnls_abund, "/genome/abund/nnls")
+            # (nnls_abund, "/genome/abund/nnls")
         ]:
             for specimen_name, genome_abund in df.iteritems():
 
