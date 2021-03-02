@@ -694,7 +694,7 @@ ls -lahtr
 // Drop files with zero alignments
 process filterAlignments {
     
-    container "ubuntu:20.04"
+    container "${container__pandas}"
     label 'io_limited'
 
     input:
