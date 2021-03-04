@@ -176,9 +176,25 @@ class collectResults:
         host="127.0.0.1",
         port=6379,
         fdr_method="fdr_bh",
+        min_genome_genes=100,
+        min_genome_prop=0.8,
+        min_cag_genes=5,
+        min_cag_prop=0.8,
     ):
+        """
+        Filters are applied as follows:
+            A genome is included if,
+            a) there are >= min_genome_genes aligned across all CAGs, or
+            b) >= min_genome_prop of the total genome length aligns, or
+            c) at least 1 CAG (with a total size >= min_cag_genes) aligns with >= min_cag_prop of genes aligning
+        """
+
         # Save attributes
         self.fdr_method = fdr_method
+        self.min_genome_genes = min_genome_genes
+        self.min_genome_prop = min_genome_prop
+        self.min_cag_genes = min_cag_genes
+        self.min_cag_prop = min_cag_prop
 
         # Set up logging
         self.setup_logging()
@@ -497,11 +513,34 @@ class collectResults:
         # Copy tables underneath this path
         genomes_detail_group = "/genomes/detail/"
 
-        # Make a set of those genomes which have any alignment details saved
-        self.genomes_to_keep = self.containment_df[
-            "genome"
-        ].drop_duplicates(
-        ).tolist()
+        # Make a set of those genomes which pass the threshold of inclusion
+        self.genomes_to_keep = []
+        
+        # Check each genome
+        for genome_id, genome_df in self.containment_df.groupby("genome"):
+
+            # If the total number of genes is >= min_genome_genes
+            if genome_df['n_genes'].sum() >= self.min_genome_genes:
+
+                # Save it
+                self.genomes_to_keep.append(genome_id)
+
+            # If the total genome proportion if >= min_genome_prop
+            elif genome_df['genome_prop'].sum() >= self.min_genome_prop:
+
+                # Save it
+                self.genomes_to_keep.append(genome_id)
+
+            # If any CAG meets the size and containment threshold
+            if genome_df.apply(
+                lambda r: r['cag_prop'] >= self.min_cag_prop and r['n_genes'] >= self.min_cag_prop * self.min_cag_genes,
+                axis=1
+            ).sum() > 0:
+
+                # Save it
+                self.genomes_to_keep.append(genome_id)
+
+            # Otherwise, it doesn't pass the filter
 
         # Populate a dict of dicts, recording the genomes which are aligned
         # to genes which are assigned to a given taxa
@@ -551,12 +590,10 @@ class collectResults:
                             # If so, get the index position
                             genome_ix = self.genomes_to_keep.index(genome_acc)
 
-                        # Otherwise, this is new
+                        # Otherwise, skip it
                         else:
 
-                            # Add it to the list and get the updated index
-                            genome_ix = len(self.genomes_to_keep)
-                            self.genomes_to_keep.append(genome_acc)
+                            continue
 
                         # To save this to redis, we'll first need to
                         # make an index of the contig lengths
