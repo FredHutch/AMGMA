@@ -393,8 +393,15 @@ class collectResults:
                 genome_ix.get
             )
         )
-        # Make sure that all values were found
-        assert self.containment_df['genome_ix'].isnull().sum() == 0
+
+        # Remove any values which were not found
+        self.containment_df = self.containment_df.reindex(
+            index=self.containment_df['genome'].dropna().index.values
+        ).reset_index(
+            drop=True
+        ).apply(
+            lambda c: c.apply(int) if c.name == 'genome' else c
+        )
 
         # Write out the number of genes assigned to CAGs by genomes
         for cag_id, cag_df in self.containment_df.groupby("CAG"):
@@ -647,7 +654,7 @@ class collectResults:
                             df['gene'].tolist()
                         )
                         
-                        # If there are taxonomic assignments per genome
+                        # If there are taxonomic assignments per gene
                         if self.r.get("gene_tax_id") is not None:
 
                             # Save a table summarizing the taxonomic assignments
@@ -656,6 +663,8 @@ class collectResults:
                             ).apply(
                                 self.r.get("gene_tax_id").get
                             ).dropna(
+                            ).apply(
+                                int
                             ).value_counts()
 
                             # Ignore unassigned genes
