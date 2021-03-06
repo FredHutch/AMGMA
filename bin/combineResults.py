@@ -392,6 +392,8 @@ class collectResults:
             genome_ix=self.containment_df['genome'].apply(
                 genome_ix.get
             )
+        ).reset_index(
+            drop=True
         )
 
         # Remove any values which were not found
