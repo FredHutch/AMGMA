@@ -396,11 +396,11 @@ class collectResults:
 
         # Remove any values which were not found
         self.containment_df = self.containment_df.reindex(
-            index=self.containment_df['genome'].dropna().index.values
+            index=self.containment_df['genome_ix'].dropna().index.values
         ).reset_index(
             drop=True
         ).apply(
-            lambda c: c.apply(int) if c.name == 'genome' else c
+            lambda c: c.apply(int) if c.name == 'genome_ix' else c
         )
 
         # Write out the number of genes assigned to CAGs by genomes
