@@ -496,10 +496,13 @@ class collectResults:
                 neg_log10_qvalue=corncob_wide["q_value"].apply(np.log10) * -1
             )
 
-        # Add the wald metric
-        corncob_wide = corncob_wide.assign(
-            wald=corncob_wide["estimate"] / corncob_wide["std_error"]
-        )
+        # Adding the wald metric is conditional on 'estimate' being present
+        if "estimate" in corncob_wide.columns.values:
+
+            # Add the wald metric
+            corncob_wide = corncob_wide.assign(
+                wald=corncob_wide["estimate"] / corncob_wide["std_error"]
+            )
 
         # Convert the genome accession to the integer genome index,
         # and use that to set the index
