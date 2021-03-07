@@ -508,9 +508,21 @@ class collectResults:
         # and use that to set the index
         corncob_wide = corncob_wide.assign(
             genome_ix = corncob_wide["genome"].apply(
-                lambda acc: self.genome_index_map[acc]
+                lambda acc: self.genome_index_map.get(acc)
             )
-        ).drop(
+        ).reset_index(
+            drop=True
+        )
+        
+        # Remove genomes that don't have an ix
+        #  (and therefore aren't in genomes_to_keep)
+        if corncob_wide["genome_ix"].isnull().sum() > 0:
+            corncob_wide = corncob_wide.reindex(
+                index=corncob_wide["genome_ix"].dropna().index.values
+            )
+
+        # Remove the genome string and set the index on the genome
+        corncob_wide = corncob_wide.drop(
             columns="genome"
         ).set_index(
             "genome_ix"
