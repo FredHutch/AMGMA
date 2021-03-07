@@ -766,8 +766,8 @@ class collectResults:
     def write_genome_abundances(self, output_store):
         """Calculate and save the abundances of each genome."""
 
-        # Make a table with the gene membership of all genomes
-        self.compute_genome_membership()
+        # # Make a table with the gene membership of all genomes
+        # self.compute_genome_membership()
 
         # Make a dict of the abundance for each genome in each specimen
         raw_abund = defaultdict(lambda: dict())
@@ -904,6 +904,7 @@ class collectResults:
         self.logger.info(f"Number of aligned genomes: {len(all_genomes):,}")
 
         # 2. Make a DataFrame with a column for each genome and a row for each gene
+        self.logger.info("Making gene membership table")
         self.gene_membership = pd.DataFrame(
             np.zeros((len(all_genomes), len(all_genes)), dtype=int),
             index=all_genomes,
@@ -912,6 +913,7 @@ class collectResults:
         )
 
         # 3. Indicate gene membership by updating cells in the table
+        self.logger.info("Populating gene membership table")
         for genome_ix, gene_set in self.genome_membership.items():
             for gene_name in list(gene_set):
                 self.gene_membership.loc[
@@ -928,7 +930,7 @@ class collectResults:
     def run_nnls(self, specimen_abund):
         """Using the genome~gene membership table, run NNLS to infer unique abundances."""
 
-        nnls_abund, nnls_resid = nnls(
+        nnls_abund, _ = nnls(
             self.gene_membership.values, 
             specimen_abund.reindex(
                 self.gene_membership.index.values
