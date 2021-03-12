@@ -28,21 +28,22 @@ parser = argparse.ArgumentParser(
 
 # Add the arguments
 parser.add_argument(
-    'output_prefix',
+    '--hdf',
     type=str,
-    help='Prefix to append to all outputs'
+    default=None,
+    help='Path to write out results in HDF5 (optional)'
 )
 parser.add_argument(
     '--host',
     type=str,
-    default="127.0.0.1",
-    help='Redis host'
+    default=None,
+    help='Redis host to write out results (optional)'
 )
 parser.add_argument(
     '--port',
     type=int,
-    default=6379,
-    help='Redis port'
+    default=None,
+    help='Redis port to write out results (optional)'
 )
 
 # Parse the arguments
@@ -172,9 +173,9 @@ class collectResults:
     
     def __init__(
         self,
-        output_prefix="OUTPUT",
-        host="127.0.0.1",
-        port=6379,
+        hdf=None,
+        host=None,
+        port=None,
         fdr_method="fdr_bh",
         min_genome_genes=100,
         min_genome_prop=0.8,
@@ -199,46 +200,69 @@ class collectResults:
         # Set up logging
         self.setup_logging()
 
-        # Connect to redis
-        self.logger.info(f"Connecting to redis at {host}:{port}")
-        self.r = DirectRedis(host=host, port=port)
+        # If a redis host was not provided
+        if host is None or port is None:
+
+            self.logger.info("Output to redis: disabled")
+            self.r = None
+
+        # If a redis host was provided
+        else:
+
+            # Connect to redis
+            self.logger.info(f"Connecting to redis at {host}:{port}")
+            self.r = DirectRedis(host=host, port=port)
 
         # Parse the output filepath from the user-provided arguments
-        self.output_hdf_fp = f"{output_prefix}.hdf5"
-        self.logger.info(f"Writing out to {self.output_hdf_fp}")
+        self.output_hdf_fp = hdf
+
+        # If an HDF output path was not provided
+        if self.output_hdf_fp is None:
+
+            # Disable the HDF output
+            self.logger.info("Writing out to HDF: disabled")
+            self.output_store = None
+
+        # If an HDF output path was provided
+        else:
+            self.logger.info(f"Writing out to {self.output_hdf_fp}")
         
+            # Open a connection to the output file
+            self.logger.info("Opening the output store (pandas)")
+            self.output_store = pd.HDFStore(self.output_hdf_fp, "a")
+
         # Read in data objects as needed
         self.load_data()
 
-        # Open a connection to the output file
-        self.logger.info("Opening the output store (pandas)")
-        output_store = pd.HDFStore(self.output_hdf_fp, "a")
-
         # Save the gene annotations (name, taxonomic, and functional annotations)
-        self.write_gene_annotations()
+        if self.r is not None:
+            self.write_gene_annotations()
 
         # Write out details of genome alignment
-        self.write_genome_details(output_store)
+        self.write_genome_details()
 
         # Write out the genome manifest to the final HDF5
-        self.write_genome_manifest(output_store)
+        self.write_genome_manifest()
 
         # Write out the combined containment table
-        self.write_containment(output_store)
+        self.write_containment()
 
         # Save the corncob results table
-        self.write_corncob_results(output_store)
+        self.write_corncob_results()
 
         # Process the abundances of each genome
-        self.write_genome_abundances(output_store)
+        self.write_genome_abundances()
 
-        # Close the output file (with the pandas connector)
-        self.logger.info("Closing the output store (pandas)")
-        output_store.close()
+        # If an HDF output path was provided
+        if self.output_hdf_fp is not None:
 
-        # Copy the genome annotations directly into the output HDF5
-        # If there are any
-        self.write_genome_annotations()
+            # Close the output file (with the pandas connector)
+            self.logger.info("Closing the output store (pandas)")
+            self.output_store.close()
+
+            # Copy the genome annotations directly into the output HDF5
+            # If there are any
+            self.write_genome_annotations()
 
         self.logger.info("Done")
 
@@ -339,7 +363,7 @@ class collectResults:
                 )
 
 
-    def write_genome_manifest(self, output_store):
+    def write_genome_manifest(self):
 
         self.logger.info("Writing out the manifest to HDF")
 
@@ -358,33 +382,40 @@ class collectResults:
         assert self.genome_manifest.shape[0] == len(self.genomes_to_keep), msg
 
         # Save to HDF
-        self.genome_manifest.to_hdf(
-            output_store,
-            "/genomes/manifest"
-        )
+        if self.output_hdf_fp is not None:
+            self.genome_manifest.to_hdf(
+                self.output_store,
+                "/genomes/manifest"
+            )
 
         # Save the mapping of genome names and IDs to redis
-        self.logger.info("Saving `genome_name` to redis")
-        self.r.set("genome_name", self.genome_manifest["name"].to_dict())
-        self.logger.info("Saving `genome_acc` to redis")
-        self.r.set("genome_acc", self.genome_manifest["id"].to_dict())
+        if self.r is not None:
+        
+            self.logger.info("Saving `genome_name` to redis")
+            self.r.set("genome_name", self.genome_manifest["name"].to_dict())
+            self.logger.info("Saving `genome_acc` to redis")
+            self.r.set("genome_acc", self.genome_manifest["id"].to_dict())
+
+        # Save the genome accession dict in memory
+        self.genome_acc = self.genome_manifest["id"].to_dict()
 
     # Write out the combined containment table
-    def write_containment(self, output_store):
+    def write_containment(self):
         
         self.logger.info("Writing out the containment to HDF")
         
-        self.containment_df.to_hdf(
-            output_store,
-            "/genomes/cags/containment",
-        )
+        if self.output_hdf_fp is not None:
+            self.containment_df.to_hdf(
+                self.output_store,
+                "/genomes/cags/containment",
+            )
 
         # Populate a dict with the number of aligned genes per genome
         n_genes_per_genome = dict()
 
         # Make a dict to transform genome accessions to integer indexes
         genome_ix = {
-            v: k for k, v in self.r.get("genome_acc").items()
+            v: k for k, v in self.genome_acc.items()
         }
 
         # Add a column to the containment DF with the genome index
@@ -406,54 +437,57 @@ class collectResults:
         )
 
         # Write out the number of genes assigned to CAGs by genomes
-        for cag_id, cag_df in self.containment_df.groupby("CAG"):
+        if self.r is not None:
+            for cag_id, cag_df in self.containment_df.groupby("CAG"):
 
-            # Write to redis
+                # Write to redis
+                self.r.set(
+                    f"cag_genome_assignments {cag_id}",
+                    cag_df.set_index('genome_ix')["n_genes"]
+                )
+
+            # Write out the number of genes assigned to genomes by CAGs
+            for genome_id, genome_df in self.containment_df.groupby("genome_ix"):
+
+                # Write to redis
+                self.r.set(
+                    f"genome_cag_assignments {genome_id}",
+                    genome_df.set_index('CAG')["n_genes"]
+                )
+
+                # Save the number of genes per genome
+                n_genes_per_genome[genome_id] = genome_df["n_genes"].sum()
+
+            # Write out the number of genes per genome to redis
+            self.logger.info("Writing `n_genes_per_genome` to redis")
             self.r.set(
-                f"cag_genome_assignments {cag_id}",
-                cag_df.set_index('genome_ix')["n_genes"]
+                "n_genes_per_genome",
+                n_genes_per_genome
             )
-
-        # Write out the number of genes assigned to genomes by CAGs
-        for genome_id, genome_df in self.containment_df.groupby("genome_ix"):
-
-            # Write to redis
-            self.r.set(
-                f"genome_cag_assignments {genome_id}",
-                genome_df.set_index('CAG')["n_genes"]
-            )
-
-            # Save the number of genes per genome
-            n_genes_per_genome[genome_id] = genome_df["n_genes"].sum()
-
-        # Write out the number of genes per genome to redis
-        self.logger.info("Writing `n_genes_per_genome` to redis")
-        self.r.set(
-            "n_genes_per_genome",
-            n_genes_per_genome
-        )
 
     # Save the corncob results table
-    def write_corncob_results(self, output_store):
+    def write_corncob_results(self):
 
         corncob_df = self.read_corncob_results("corncob.results.csv")
 
-        self.logger.info("Writing to /stats/genome/corncob")
-        corncob_df.to_hdf(
-            output_store,
-            "/stats/genome/corncob"
-        )
-
-        for parameter, parameter_df in corncob_df.groupby("parameter"):
-            # Skip the intercept
-            if parameter == "(Intercept)":
-                continue
-
-            self.logger.info(f"Writing to genome_association {parameter}")
-            self.r.set(
-                f"genome_association {parameter}",
-                parameter_df
+        if self.output_hdf_fp is not None:
+            self.logger.info("Writing to /stats/genome/corncob")
+            corncob_df.to_hdf(
+                self.output_store,
+                "/stats/genome/corncob"
             )
+
+        if self.r is not None:
+            for parameter, parameter_df in corncob_df.groupby("parameter"):
+                # Skip the intercept
+                if parameter == "(Intercept)":
+                    continue
+
+                self.logger.info(f"Writing to genome_association {parameter}")
+                self.r.set(
+                    f"genome_association {parameter}",
+                    parameter_df
+                )
 
 
     def read_corncob_results(self, corncob_csv, group_name="genome"):
@@ -532,7 +566,7 @@ class collectResults:
 
 
     # Write out details of genome alignment
-    def write_genome_details(self, output_store):
+    def write_genome_details(self):
 
         # Copy tables underneath this path
         genomes_detail_group = "/genomes/detail/"
@@ -602,11 +636,12 @@ class collectResults:
                         # Read the table
                         df = pd.read_hdf(input_store, k)
 
-                        # Copy over the table to the output
-                        df.to_hdf(
-                            output_store,
-                            k
-                        )
+                        # Copy over the table to the output HDF
+                        if self.output_hdf_fp is not None:
+                            df.to_hdf(
+                                self.output_store,
+                                k
+                            )
 
                         # Check to see if this genome is already in the list of genomes to keep
                         if genome_acc in self.genomes_to_keep:
@@ -629,10 +664,11 @@ class collectResults:
                             ascending=False
                         ).reset_index(drop=True)
 
-                        self.r.set(
-                            f"genome_contigs {genome_ix}",
-                            contig_df
-                        )
+                        if self.r is not None:
+                            self.r.set(
+                                f"genome_contigs {genome_ix}",
+                                contig_df
+                            )
 
                         # Index contigs by name
                         contig_index = {
@@ -659,10 +695,11 @@ class collectResults:
                         )
 
                         # Save the indexed alignments to redis
-                        self.r.set(
-                            f"genome_alignment {genome_ix}",
-                            alignment_df
-                        )
+                        if self.r is not None:
+                            self.r.set(
+                                f"genome_alignment {genome_ix}",
+                                alignment_df
+                            )
 
                         # Save the set of genes aligned to this genome
                         self.genome_membership[
@@ -672,7 +709,7 @@ class collectResults:
                         )
                         
                         # If there are taxonomic assignments per gene
-                        if self.r.get("gene_tax_id") is not None:
+                        if self.r is not None and self.r.get("gene_tax_id") is not None:
 
                             # Save a table summarizing the taxonomic assignments
                             taxa_vc = df['gene'].apply(
@@ -714,13 +751,14 @@ class collectResults:
         }
 
         # Save the number of aligned genes to each genome, per taxa
-        for tax_id, genome_counts in tax_genome_counts.items():
-            redis_key = f"tax_genome_assignments {tax_id}"
-            self.logger.info(f"Saving {redis_key}")
-            self.r.set(
-                redis_key,
-                genome_counts
-            )
+        if self.r is not None:
+            for tax_id, genome_counts in tax_genome_counts.items():
+                redis_key = f"tax_genome_assignments {tax_id}"
+                self.logger.info(f"Saving {redis_key}")
+                self.r.set(
+                    redis_key,
+                    genome_counts
+                )
 
     # Write out the genome annotations, if there are any
     def write_genome_annotations(self, input_hdf="genome.annotations.hdf5"):
@@ -728,7 +766,7 @@ class collectResults:
         # Open the output HDF5 with h5py
         # This will make it easier to directly copy data into it
         self.logger.info("Opening the output store (h5py)")
-        output_store = h5py.File(self.output_hdf_fp, "a")
+        self.output_store = h5py.File(self.output_hdf_fp, "a")
 
         self.logger.info(
             "Attempting to read annotations from genome.annotations.hdf5")
@@ -754,7 +792,7 @@ class collectResults:
                 n_genomes = len(self.genomes_to_keep)
                 self.logger.info(f"Filtering down to {n_genomes:,} genomes")
                 self.logger.info("Creating /genomes/annotations group")
-                output_store.create_group("/genomes/annotations")
+                self.output_store.create_group("/genomes/annotations")
 
                 # Iterate over every genome available
                 for genome_id in annotation_store["/annotations/"].keys():
@@ -763,7 +801,7 @@ class collectResults:
 
                         annotation_store.copy(
                             "/annotations/%s" % genome_id,
-                            output_store["/genomes/annotations"]
+                            self.output_store["/genomes/annotations"]
                         )
             else:
                 self.logger.info("No /annotations/* found in store")
@@ -773,9 +811,9 @@ class collectResults:
             self.logger.info("Done copying annotations")
 
         self.logger.info("Closing the output store (h5py)")
-        output_store.close()
+        self.output_store.close()
 
-    def write_genome_abundances(self, output_store):
+    def write_genome_abundances(self):
         """Calculate and save the abundances of each genome."""
 
         # # Make a table with the gene membership of all genomes
@@ -809,52 +847,56 @@ class collectResults:
         raw_abund = pd.DataFrame(raw_abund).fillna(0)
         # nnls_abund = pd.DataFrame(nnls_abund).fillna(0)
 
-        # Save the abundances per-genome and per-specimen to redis
-        self.save_abundance_table(
-            raw_abund,
-            "genome_abundance_specimen",
-            "specimen_abundance_genome"
-        )
-        # self.save_abundance_table(
-        #     nnls_abund,
-        #     "genome_nnls_specimen",
-        #     "specimen_nnls_genome"
-        # )
+        # If we can output to redis
+        if self.r is not None:
 
-        # Save the average abundance across all specimens
-        self.logger.info("Saving mean_abundance_genomes")
-        self.r.set(
-            "mean_abundance_genomes",
-            raw_abund.mean(axis=1)
-        )
-        # self.logger.info("Saving mean_nnls_genomes")
-        # self.r.set(
-        #     "mean_nnls_genomes",
-        #     nnls_abund.mean(axis=1)
-        # )
+            # Save the abundances per-genome and per-specimen to redis
+            self.save_abundance_table(
+                raw_abund,
+                "genome_abundance_specimen",
+                "specimen_abundance_genome"
+            )
+            # self.save_abundance_table(
+            #     nnls_abund,
+            #     "genome_nnls_specimen",
+            #     "specimen_nnls_genome"
+            # )
+
+            # Save the average abundance across all specimens
+            self.logger.info("Saving mean_abundance_genomes")
+            self.r.set(
+                "mean_abundance_genomes",
+                raw_abund.mean(axis=1)
+            )
+            # self.logger.info("Saving mean_nnls_genomes")
+            # self.r.set(
+            #     "mean_nnls_genomes",
+            #     nnls_abund.mean(axis=1)
+            # )
 
         # Now save the abundances per-specimen to HDF
-        for df, hdf_prefix in [
-            (raw_abund, "/genome/abund/raw"),
-            # (nnls_abund, "/genome/abund/nnls")
-        ]:
-            for specimen_name, genome_abund in df.iteritems():
+        if self.output_hdf_fp is not None:
+            for df, hdf_prefix in [
+                (raw_abund, "/genome/abund/raw"),
+                # (nnls_abund, "/genome/abund/nnls")
+            ]:
+                for specimen_name, genome_abund in df.iteritems():
 
-                # Set up the key to write out to
-                hdf_key = f"{hdf_prefix}/{specimen_name}"
-                self.logger.info(f"Writing out {hdf_key}")
+                    # Set up the key to write out to
+                    hdf_key = f"{hdf_prefix}/{specimen_name}"
+                    self.logger.info(f"Writing out {hdf_key}")
 
-                # Transform the genome indexes back into accessions
-                pd.DataFrame(dict(
-                    abund=genome_abund.values,
-                    acc=[
-                        self.genomes_to_keep[ix]
-                        for ix in genome_abund.index.values
-                    ]
-                )).to_hdf(
-                    output_store,
-                    hdf_key
-                )
+                    # Transform the genome indexes back into accessions
+                    pd.DataFrame(dict(
+                        abund=genome_abund.values,
+                        acc=[
+                            self.genomes_to_keep[ix]
+                            for ix in genome_abund.index.values
+                        ]
+                    )).to_hdf(
+                        self.output_store,
+                        hdf_key
+                    )
 
     def save_abundance_table(self, abund_df, row_key, col_key):
         for row_ix, row_vals in abund_df.iterrows():
@@ -961,7 +1003,7 @@ if __name__ == "__main__":
 
     # Entrypoint
     collectResults(
-        output_prefix=args.output_prefix,
+        hdf=args.hdf,
         host=args.host,
         port=args.port,
     )

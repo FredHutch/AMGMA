@@ -258,13 +258,26 @@ workflow {
     )
 
     // Collect results and combine across all shards
-    combineResults(
+
+    // Create a redis .rdb file
+    combineResultsRedis(
         calculateContainment.out[0].toSortedList(),
         calculateContainment.out[1].toSortedList(),
         extractCounts.out[1].toSortedList(),
         joinCorncob.out,
         validateManifest.out,
-        unpackDatabase.out[2],
+        geneshot_details_hdf,
+        geneshot_results_hdf,
+        geneshot_rdb
+    )
+
+    // Create an HDF5 file
+    combineResultsHDF(
+        calculateContainment.out[0].toSortedList(),
+        calculateContainment.out[1].toSortedList(),
+        extractCounts.out[1].toSortedList(),
+        joinCorncob.out,
+        validateManifest.out,
         geneshot_details_hdf,
         geneshot_results_hdf,
         geneshot_rdb
@@ -272,7 +285,7 @@ workflow {
 
     // Repack an HDF5 file
     repackHDF(
-        combineResults.out[0]
+        combineResultsHDF.out
     )
 
 }
@@ -798,7 +811,9 @@ process formatResults {
 
 
 // Collect results and combine across all shards
-process combineResults {
+
+// Output to redis
+process combineResultsRedis {
     container "${container__pandas}"
     label 'mem_medium'
     publishDir "${params.output_folder}"
@@ -809,15 +824,12 @@ process combineResults {
         file "abundance_shard.*.csv.gz"
         file "corncob.results.csv"
         file "genome.manifest.csv"
-        file "genome.annotations.hdf5"
         file "geneshot.details.hdf5"
         file "geneshot.results.hdf5"
         file "geneshot.results.rdb"
     
     output:
-        file "${params.output_prefix}.hdf5"
         file "${params.output_prefix}.rdb"
-        file "${params.output_prefix}.annotations.hdf5"
 
 """#!/bin/bash
 
@@ -833,7 +845,6 @@ redis-server \
     --dir \$PWD &
 
 combineResults.py \
-    "${params.output_prefix}" \
     --port 6379 \
     --host 127.0.0.1 || \
     redis-cli shutdown  # In case of failure
@@ -846,11 +857,38 @@ redis-cli save
 echo "Shutting down the redis server"
 redis-cli shutdown
 
-# Rename the redis DB and annotations HDF5, if any
+# Rename the redis DB
 mv geneshot.results.rdb "${params.output_prefix}.rdb"
-mv genome.annotations.hdf5 "${params.output_prefix}.annotations.hdf5"
 
 echo "Done"
+"""
+
+}
+
+// Output to HDF
+process combineResultsHDF {
+    container "${container__pandas}"
+    label 'mem_medium'
+
+    input:
+        file "containment_shard.*.csv.gz"
+        file "containment_shard.*.hdf5"
+        file "abundance_shard.*.csv.gz"
+        file "corncob.results.csv"
+        file "genome.manifest.csv"
+        file "geneshot.details.hdf5"
+        file "geneshot.results.hdf5"
+        file "geneshot.results.rdb"
+    
+    output:
+        file "${params.output_prefix}.hdf5"
+
+"""#!/bin/bash
+
+set -Eeuo pipefail
+
+combineResults.py --hdf "${params.output_prefix}.hdf5"
+
 """
 
 }
