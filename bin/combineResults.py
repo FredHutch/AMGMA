@@ -247,8 +247,11 @@ class collectResults:
         # Write out the combined containment table
         self.write_containment()
 
-        # Save the corncob results table
-        self.write_corncob_results()
+        # If there are corncob results available
+        if os.path.exists("corncob.results.csv"):
+
+            # Save the corncob results table
+            self.write_corncob_results()
 
         # Process the abundances of each genome
         self.write_genome_abundances()
