@@ -15,11 +15,9 @@ params.output_prefix = null
 params.min_coverage = 50
 params.min_identity = 80
 params.top = 5
-params.formula = false
 params.fdr_method = "fdr_bh"
 params.alpha = 0.2
 params.blast = false
-params.no_associations = false
 // Only show alignments for CAGs with at least this number of genes aligned
 params.min_genes_per_cag = 2
 // Align against any contigs with this minimum size (or circular)
@@ -44,27 +42,26 @@ Usage:
 nextflow run FredHutch/AMGMA <ARGUMENTS>
 
 Required Arguments:
---db                  AMGMA database(s) (ends with .tar), with commas delimiting multiple databases
---geneshot_folder     Folder containing geneshot results, which includes:
-                        - Results HDF file output by geneshot (*results.hdf5)
-                          [overridden by --geneshot_results_hdf]
-                        - Detailed HDF file output by geneshot (*details.hdf5)
-                          [overridden by --geneshot_details_hdf]
-                        - DIAMOND database containing the gene catalog (ref/genes.dmnd)
-                          [overridden by --geneshot_dmnd]
---output_folder       Folder used to write outputs
---output_prefix       Prefix appended to files in the output directory
+    --db                  AMGMA database(s) (ends with .tar), with commas delimiting multiple databases
+    --geneshot_folder     Folder containing geneshot results, which includes:
+                            - Results HDF file output by geneshot (*results.hdf5)
+                            [overridden by --geneshot_results_hdf]
+                            - Detailed HDF file output by geneshot (*details.hdf5)
+                            [overridden by --geneshot_details_hdf]
+                            - DIAMOND database containing the gene catalog (ref/genes.dmnd)
+                            [overridden by --geneshot_dmnd]
+    --output_folder       Folder used to write outputs
+    --output_prefix       Prefix appended to files in the output directory
 
 Optional Arguments:
---min_coverage        Minimum coverage required for alignment (default: 50)
---min_identity        Minimum percent identity required for alignment (default: 80)
---top                 Threshold used to retain overlapping alignments within --top% score of the max score (default: 5)
---formula             If specified, calculate association of genome abundances with experimental design
---fdr_method          Method used for FDR correction (default: fdr_bh)
---alpha               Alpha value used for FDR correction (default: 0.2)
---blast               Align with BLAST+ instead of DIAMOND
---no_associations     Exclude all analysis of CAG association metrics
---min_genes_per_cag   Only show alignments for CAGs with at least this number of genes aligned (default: 2)
+    --min_coverage        Minimum coverage required for alignment (default: 50)
+    --min_identity        Minimum percent identity required for alignment (default: 80)
+    --top                 Threshold used to retain overlapping alignments within --top% score of the max score (default: 5)
+    --fdr_method          Method used for FDR correction (default: fdr_bh)
+    --alpha               Alpha value used for FDR correction (default: 0.2)
+    --blast               Align with BLAST+ instead of DIAMOND
+    --min_genes_per_cag   Only show alignments for CAGs with at least this number of genes aligned (default: 2)
+    --min_contig_len      Align against contigs longer than this value (default: 25000)
 
 Output HDF:
 The primary output from AMGMA is formatted in HDF5 (OUTPUT_PREFIX.hdf5) to combine multiple tables
@@ -158,6 +155,11 @@ workflow {
         fp -> file(fp) 
     }
 
+    // Extract the formula used by geneshot (if any)
+    extractFormula(
+        geneshot_results_hdf
+    )
+
     // Unpack the database(s)
     unpackDatabase(db_ch)
 
@@ -232,79 +234,49 @@ workflow {
         geneshot_results_hdf
     )
 
-    // If a formula was provided
-    if ( params.formula ){
+    // Calculate the proportion of gene copies from each specimen which align to each genome
+    extractCounts(
+        calculateContainment.out[1],
+        geneshot_details_hdf
+    )
 
-        // Calculate the proportion of gene copies from each specimen which align to each genome
-        extractCounts(
-            calculateContainment.out[1],
-            geneshot_details_hdf
-        )
+    // Run corncob on the genome abundances
+    runCorncob(
+        extractCounts.out[0],
+        extractFormula.out[0],
+        "genome",
+        extractFormula.out[1].map {
+            it -> it.readLines()
+        }.flatten()
+    )
 
-        // Run corncob on the genome abundances
-        runCorncob(
-            extractCounts.out[0],
-            extractFormula.out[0],
-            "genome",
-            extractFormula.out[1].map {
-                it -> it.readLines()
-            }.flatten()
-        )
+    // Join together all of the corncob results
+    joinCorncob(
+        runCorncob.out.toSortedList(),
+        "genome"
+    )
 
-        // Join together all of the corncob results
-        joinCorncob(
-            runCorncob.out.toSortedList(),
-            "genome"
-        )
+    // Create a redis .rdb file
+    combineResultsRedis(
+        calculateContainment.out[0].toSortedList(),
+        calculateContainment.out[1].toSortedList(),
+        joinCorncob.out.toSortedList(),
+        validateManifest.out,
+        geneshot_details_hdf,
+        geneshot_results_hdf,
+        geneshot_rdb
+    )
 
-        // Create a redis .rdb file
-        combineResultsRedisFormula(
-            calculateContainment.out[0].toSortedList(),
-            calculateContainment.out[1].toSortedList(),
-            joinCorncob.out.toSortedList(),
-            validateManifest.out,
-            geneshot_details_hdf,
-            geneshot_results_hdf,
-            geneshot_rdb
-        )
-
-        // Create an HDF5 file
-        combineResultsHDFFormula(
-            calculateContainment.out[0].toSortedList(),
-            calculateContainment.out[1].toSortedList(),
-            joinCorncob.out.toSortedList(),
-            validateManifest.out,
-            geneshot_details_hdf,
-            geneshot_results_hdf,
-            geneshot_rdb
-        )
-
-    } else {
-
-        // Create a redis .rdb file
-        combineResultsRedis(
-            calculateContainment.out[0].toSortedList(),
-            calculateContainment.out[1].toSortedList(),
-            validateManifest.out,
-            geneshot_details_hdf,
-            geneshot_results_hdf,
-            geneshot_rdb
-        )
-
-        // Create an HDF5 file
-        combineResultsHDF(
-            calculateContainment.out[0].toSortedList(),
-            calculateContainment.out[1].toSortedList(),
-            validateManifest.out,
-            geneshot_details_hdf,
-            geneshot_results_hdf,
-            geneshot_rdb
-        )
-
-    }
-
-    // Collect results and combine across all shards
-
+    // Create an HDF5 file
+    combineResultsHDF(
+        calculateContainment.out[0].toSortedList(),
+        calculateContainment.out[1].toSortedList(),
+        joinCorncob.out.toSortedList(),
+        validateManifest.out,
+        geneshot_details_hdf,
+        geneshot_results_hdf,
+        geneshot_rdb
+    )
 
     // Repack an HDF5 file
     repackHDF(
@@ -431,8 +403,7 @@ if "formula" in dat:
 
     # Save it to formula.txt
     with open('formula.txt', 'wt') as handle:
-        for v in dat['formula'].split(","):
-            handle.write(v)
+        handle.write("\\n".join(dat['formula'].split(",")))
 """
 }
 
@@ -844,57 +815,6 @@ process combineResultsRedis {
     input:
         file "containment_shard.*.csv.gz"
         file "containment_shard.*.hdf5"
-        file "genome.manifest.csv"
-        file "geneshot.details.hdf5"
-        file "geneshot.results.hdf5"
-        file "geneshot.results.rdb"
-    
-    output:
-        file "${params.output_prefix}.rdb"
-
-"""#!/bin/bash
-
-set -Eeuo pipefail
-
-# Start a redis server in the background
-redis-server \
-    --port 6379 \
-    --bind 127.0.0.1 \
-    --rdbcompression yes \
-    --save "" \
-    --dbfilename geneshot.results.rdb \
-    --dir \$PWD &
-
-combineResults.py \
-    --port 6379 \
-    --host 127.0.0.1 || \
-    redis-cli shutdown  # In case of failure
-
-# Save the redis store
-echo "Saving the redis store"
-redis-cli save
-
-# Shutdown the redis server
-echo "Shutting down the redis server"
-redis-cli shutdown
-
-# Rename the redis DB
-mv geneshot.results.rdb "${params.output_prefix}.rdb"
-
-echo "Done"
-"""
-
-}
-
-// Output to redis -- include data generated by corncob from the formula
-process combineResultsRedisFormula {
-    container "${container__pandas}"
-    label 'mem_medium'
-    publishDir "${params.output_folder}"
-
-    input:
-        file "containment_shard.*.csv.gz"
-        file "containment_shard.*.hdf5"
         file "corncob.results.csv"
         file "genome.manifest.csv"
         file "geneshot.details.hdf5"
@@ -940,32 +860,6 @@ echo "Done"
 
 // Output to HDF
 process combineResultsHDF {
-    container "${container__pandas}"
-    label 'mem_medium'
-
-    input:
-        file "containment_shard.*.csv.gz"
-        file "containment_shard.*.hdf5"
-        file "genome.manifest.csv"
-        file "geneshot.details.hdf5"
-        file "geneshot.results.hdf5"
-        file "geneshot.results.rdb"
-    
-    output:
-        file "${params.output_prefix}.hdf5"
-
-"""#!/bin/bash
-
-set -Eeuo pipefail
-
-combineResults.py --hdf "${params.output_prefix}.hdf5"
-
-"""
-
-}
-
-// Output to HDF -- including corncob results
-process combineResultsHDFFormula {
     container "${container__pandas}"
     label 'mem_medium'
 
