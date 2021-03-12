@@ -15,6 +15,7 @@ params.output_prefix = null
 params.min_coverage = 50
 params.min_identity = 80
 params.top = 5
+params.formula = false
 params.fdr_method = "fdr_bh"
 params.alpha = 0.2
 params.blast = false
@@ -58,6 +59,7 @@ Optional Arguments:
 --min_coverage        Minimum coverage required for alignment (default: 50)
 --min_identity        Minimum percent identity required for alignment (default: 80)
 --top                 Threshold used to retain overlapping alignments within --top% score of the max score (default: 5)
+--formula             If specified, calculate association of genome abundances with experimental design
 --fdr_method          Method used for FDR correction (default: fdr_bh)
 --alpha               Alpha value used for FDR correction (default: 0.2)
 --blast               Align with BLAST+ instead of DIAMOND
@@ -156,11 +158,6 @@ workflow {
         fp -> file(fp) 
     }
 
-    // Extract the formula used for the geneshot analysis, if any
-    extractFormula(
-        geneshot_results_hdf
-    )
-
     // Unpack the database(s)
     unpackDatabase(db_ch)
 
@@ -235,27 +232,40 @@ workflow {
         geneshot_results_hdf
     )
 
-    // Calculate the proportion of gene copies from each specimen which align to each genome
-    extractCounts(
-        calculateContainment.out[1],
-        geneshot_details_hdf
-    )
+    // If a formula was provided
+    if ( params.formula ){
 
-    // Run corncob on the genome abundances
-    runCorncob(
-        extractCounts.out[0],
-        extractFormula.out[0],
-        "genome",
-        extractFormula.out[1].map {
-            it -> it.readLines()
-        }.flatten()
-    )
+        // Calculate the proportion of gene copies from each specimen which align to each genome
+        extractCounts(
+            calculateContainment.out[1],
+            geneshot_details_hdf
+        )
 
-    // Join together all of the corncob results
-    joinCorncob(
-        runCorncob.out.toSortedList(),
-        "genome"
-    )
+        // Run corncob on the genome abundances
+        runCorncob(
+            extractCounts.out[0],
+            extractFormula.out[0],
+            "genome",
+            extractFormula.out[1].map {
+                it -> it.readLines()
+            }.flatten()
+        )
+
+        // Join together all of the corncob results
+        joinCorncob(
+            runCorncob.out.toSortedList(),
+            "genome"
+        )
+
+        // Get the output of the joined corncob results
+        corncob_csv = joinCorncob.out.toSortedList()
+
+    } else {
+
+        // Create an empty channel with a placeholder
+        corncob_csv = Channel.of([]).toSortedList()
+
+    }
 
     // Collect results and combine across all shards
 
@@ -264,7 +274,7 @@ workflow {
         calculateContainment.out[0].toSortedList(),
         calculateContainment.out[1].toSortedList(),
         extractCounts.out[1].toSortedList(),
-        joinCorncob.out,
+        corncob_csv,
         validateManifest.out,
         geneshot_details_hdf,
         geneshot_results_hdf,
@@ -276,7 +286,7 @@ workflow {
         calculateContainment.out[0].toSortedList(),
         calculateContainment.out[1].toSortedList(),
         extractCounts.out[1].toSortedList(),
-        joinCorncob.out,
+        corncob_csv,
         validateManifest.out,
         geneshot_details_hdf,
         geneshot_results_hdf,
@@ -822,7 +832,7 @@ process combineResultsRedis {
         file "containment_shard.*.csv.gz"
         file "containment_shard.*.hdf5"
         file "abundance_shard.*.csv.gz"
-        file "corncob.results.csv"
+        file "*"
         file "genome.manifest.csv"
         file "geneshot.details.hdf5"
         file "geneshot.results.hdf5"
@@ -874,7 +884,7 @@ process combineResultsHDF {
         file "containment_shard.*.csv.gz"
         file "containment_shard.*.hdf5"
         file "abundance_shard.*.csv.gz"
-        file "corncob.results.csv"
+        file "*"
         file "genome.manifest.csv"
         file "geneshot.details.hdf5"
         file "geneshot.results.hdf5"
